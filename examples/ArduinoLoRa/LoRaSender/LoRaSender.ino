@@ -75,13 +75,13 @@ void loop()
     LoRa.print(counter);
     LoRa.endPacket();
 
-    if (u8g2) {
+    if (disp) {
         char buf[256];
-        u8g2->clearBuffer();
-        u8g2->drawStr(0, 12, "Transmitting: OK!");
+        disp->clearBuffer();
+        disp->drawStr(0, 12, "Transmitting: OK!");
         snprintf(buf, sizeof(buf), "Sending: %d", counter);
-        u8g2->drawStr(0, 30, buf);
-        u8g2->sendBuffer();
+        disp->drawStr(0, 30, buf);
+        disp->sendBuffer();
     }
     counter++;
     delay(5000);

@@ -81,12 +81,12 @@ void do_send(osjob_t *j)
         // Prepare upstream data transmission at the next possible time.
         LMIC_setTxData2(1, mydata, sizeof(mydata) - 1, 0);
         os_setTimedCallback(&sendjob, os_getTime() + sec2osticks(TX_INTERVAL), do_send);
-        if (u8g2) {
+        if (disp) {
             char buf[256];
-            u8g2->clearBuffer();
+            disp->clearBuffer();
             snprintf(buf, sizeof(buf), "[%lu]data sending!", millis() / 1000);
-            u8g2->drawStr(0, 12, buf);
-            u8g2->sendBuffer();
+            disp->drawStr(0, 12, buf);
+            disp->sendBuffer();
         }
     }
 }
@@ -122,19 +122,19 @@ void onEvent (ev_t ev)
         lora_msg = "OTAA joining....";
         joinStatus = EV_JOINING;
 
-        if (u8g2) {
-            u8g2->clearBuffer();
-            u8g2->drawStr(0, 12, "OTAA joining....");
-            u8g2->sendBuffer();
+        if (disp) {
+            disp->clearBuffer();
+            disp->drawStr(0, 12, "OTAA joining....");
+            disp->sendBuffer();
         }
         break;
     case EV_JOIN_FAILED:
         Serial.println(F("EV_JOIN_FAILED: -> Joining failed"));
         lora_msg = "OTAA Joining failed";
-        if (u8g2) {
-            u8g2->clearBuffer();
-            u8g2->drawStr(0, 12, "OTAA joining failed");
-            u8g2->sendBuffer();
+        if (disp) {
+            disp->clearBuffer();
+            disp->drawStr(0, 12, "OTAA joining failed");
+            disp->sendBuffer();
         }
         break;
     case EV_JOINED:
@@ -142,10 +142,10 @@ void onEvent (ev_t ev)
         lora_msg = "Joined!";
         joinStatus = EV_JOINED;
 
-        if (u8g2) {
-            u8g2->clearBuffer();
-            u8g2->drawStr(0, 12, "Joined TTN!");
-            u8g2->sendBuffer();
+        if (disp) {
+            disp->clearBuffer();
+            disp->drawStr(0, 12, "Joined TTN!");
+            disp->sendBuffer();
         }
         delay(3);
         // Disable link check validation (automatically enabled

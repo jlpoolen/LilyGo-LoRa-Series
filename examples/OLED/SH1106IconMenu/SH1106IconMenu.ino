@@ -5,7 +5,7 @@
   This is an interactive demo and requires "next", "prev" and "select" button.
   Minimum height of the display should be 64.
 
-  Universal 8bit Graphics Library (https://github.com/olikraus/u8g2/)
+  Universal 8bit Graphics Library (https://github.com/olikraus/disp/)
 
   Copyright (c) 2016, olikraus@gmail.com
   All rights reserved.
@@ -42,11 +42,11 @@
 void setup(void)
 {
     setupBoards();
-    if (!u8g2) {
+    if (!disp) {
         Serial.println("No find SH1106 display!Please check whether the connection is normal");
         while (1);
     }
-    u8g2->setFont(u8g2_font_6x12_tr);
+    disp->setFont(u8g2_font_6x12_tr);
 }
 
 struct menu_entry_type {
@@ -89,28 +89,28 @@ void draw(struct menu_state *state)
     x = state->menu_start;
     i = 0;
     while ( menu_entry_list[i].icon > 0 ) {
-        if ( x >= -ICON_WIDTH && x < u8g2->getDisplayWidth() ) {
-            u8g2->setFont(menu_entry_list[i].font);
-            u8g2->drawGlyph(x, ICON_Y, menu_entry_list[i].icon );
+        if ( x >= -ICON_WIDTH && x < disp->getDisplayWidth() ) {
+            disp->setFont(menu_entry_list[i].font);
+            disp->drawGlyph(x, ICON_Y, menu_entry_list[i].icon );
         }
         i++;
         x += ICON_WIDTH + ICON_GAP;
     }
-    u8g2->drawFrame(state->frame_position - 1, ICON_Y - ICON_HEIGHT - 1, ICON_WIDTH + 2, ICON_WIDTH + 2);
-    u8g2->drawFrame(state->frame_position - 2, ICON_Y - ICON_HEIGHT - 2, ICON_WIDTH + 4, ICON_WIDTH + 4);
-    u8g2->drawFrame(state->frame_position - 3, ICON_Y - ICON_HEIGHT - 3, ICON_WIDTH + 6, ICON_WIDTH + 6);
+    disp->drawFrame(state->frame_position - 1, ICON_Y - ICON_HEIGHT - 1, ICON_WIDTH + 2, ICON_WIDTH + 2);
+    disp->drawFrame(state->frame_position - 2, ICON_Y - ICON_HEIGHT - 2, ICON_WIDTH + 4, ICON_WIDTH + 4);
+    disp->drawFrame(state->frame_position - 3, ICON_Y - ICON_HEIGHT - 3, ICON_WIDTH + 6, ICON_WIDTH + 6);
 }
 
 
 void to_right(struct menu_state *state)
 {
     if ( menu_entry_list[state->position + 1].font != NULL ) {
-        if ( (int16_t)state->frame_position + 2 * (int16_t)ICON_WIDTH + (int16_t)ICON_BGAP < (int16_t)u8g2->getDisplayWidth() ) {
+        if ( (int16_t)state->frame_position + 2 * (int16_t)ICON_WIDTH + (int16_t)ICON_BGAP < (int16_t)disp->getDisplayWidth() ) {
             state->position++;
             state->frame_position += ICON_WIDTH + (int16_t)ICON_GAP;
         } else {
             state->position++;
-            state->frame_position = (int16_t)u8g2->getDisplayWidth() - (int16_t)ICON_WIDTH - (int16_t)ICON_BGAP;
+            state->frame_position = (int16_t)disp->getDisplayWidth() - (int16_t)ICON_WIDTH - (int16_t)ICON_BGAP;
             state->menu_start = state->frame_position - state->position * ((int16_t)ICON_WIDTH + (int16_t)ICON_GAP);
         }
     }
@@ -164,21 +164,21 @@ void loop(void)
     int8_t event;
 
     do {
-        u8g2->clearBuffer();
+        disp->clearBuffer();
         draw(&current_state);
-        u8g2->setFont(u8g2_font_helvB10_tr);
-        u8g2->setCursor((u8g2->getDisplayWidth() - u8g2->getStrWidth(menu_entry_list[destination_state.position].name)) / 2, u8g2->getDisplayHeight() - 5);
-        u8g2->print(menu_entry_list[destination_state.position].name);
-        u8g2->sendBuffer();
+        disp->setFont(u8g2_font_helvB10_tr);
+        disp->setCursor((disp->getDisplayWidth() - disp->getStrWidth(menu_entry_list[destination_state.position].name)) / 2, disp->getDisplayHeight() - 5);
+        disp->print(menu_entry_list[destination_state.position].name);
+        disp->sendBuffer();
         delay(10);
-        event = u8g2->getMenuEvent();
+        event = disp->getMenuEvent();
         if ( event == U8X8_MSG_GPIO_MENU_NEXT )
             to_right(&destination_state);
         if ( event == U8X8_MSG_GPIO_MENU_PREV )
             to_left(&destination_state);
         if ( event == U8X8_MSG_GPIO_MENU_SELECT ) {
-            u8g2->setFont(u8g2_font_helvB10_tr);
-            u8g2->userInterfaceMessage("Selection:", menu_entry_list[destination_state.position].name, "", " Ok ");
+            disp->setFont(u8g2_font_helvB10_tr);
+            disp->userInterfaceMessage("Selection:", menu_entry_list[destination_state.position].name, "", " Ok ");
         }
     } while ( towards(&current_state, &destination_state) );
 }

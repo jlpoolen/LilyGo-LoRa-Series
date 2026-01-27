@@ -350,16 +350,16 @@ void setup()
 
     Serial.println(F("Ready!\n"));
 
-    if (u8g2) {
-        u8g2->clearBuffer();
-        u8g2->setFont(u8g2_font_NokiaLargeBold_tf );
-        uint16_t str_w =  u8g2->getStrWidth(BOARD_VARIANT_NAME);
-        u8g2->drawStr((u8g2->getWidth() - str_w) / 2, 16, BOARD_VARIANT_NAME);
-        u8g2->drawHLine(5, 21, u8g2->getWidth() - 5);
+    if (disp) {
+        disp->clearBuffer();
+        disp->setFont(u8g2_font_NokiaLargeBold_tf );
+        uint16_t str_w =  disp->getStrWidth(BOARD_VARIANT_NAME);
+        disp->drawStr((disp->getWidth() - str_w) / 2, 16, BOARD_VARIANT_NAME);
+        disp->drawHLine(5, 21, disp->getWidth() - 5);
 
-        u8g2->setCursor(0, 38);
-        u8g2->print("Join LoRaWAN Ready!");
-        u8g2->sendBuffer();
+        disp->setCursor(0, 38);
+        disp->print("Join LoRaWAN Ready!");
+        disp->sendBuffer();
     }
 }
 

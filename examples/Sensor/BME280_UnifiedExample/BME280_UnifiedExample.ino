@@ -35,12 +35,12 @@ void setup()
 
     if (!bme.begin()) {
         Serial.println(F("Could not find a valid BME280 sensor, check wiring!"));
-        if (u8g2) {
-            u8g2->setFont(u8g2_font_ncenB08_tr);
-            u8g2->clearBuffer();
-            u8g2->setCursor(0, 16);
-            u8g2->print("BME280 Could not find");
-            u8g2->sendBuffer();
+        if (disp) {
+            disp->setFont(u8g2_font_ncenB08_tr);
+            disp->clearBuffer();
+            disp->setCursor(0, 16);
+            disp->print("BME280 Could not find");
+            disp->sendBuffer();
         }
         while (1) delay(10);
     }
@@ -72,27 +72,27 @@ void loop()
     Serial.println();
 
 
-    if (u8g2) {
-        u8g2->setFont(u8g2_font_ncenB08_tr);
-        u8g2->clearBuffer();
+    if (disp) {
+        disp->setFont(u8g2_font_ncenB08_tr);
+        disp->clearBuffer();
 
-        u8g2->setCursor(0, 16);
+        disp->setCursor(0, 16);
 
-        u8g2->print("Temperature:");
-        u8g2->print(temp_event.temperature);
-        u8g2->print(" *C");
+        disp->print("Temperature:");
+        disp->print(temp_event.temperature);
+        disp->print(" *C");
 
-        u8g2->setCursor(0, 32);
-        u8g2->print("Pressure:");
-        u8g2->println(pressure_event.pressure);
-        u8g2->print(" hPa");
+        disp->setCursor(0, 32);
+        disp->print("Pressure:");
+        disp->println(pressure_event.pressure);
+        disp->print(" hPa");
 
-        u8g2->setCursor(0, 48);
-        u8g2->print("Humidity:");
-        u8g2->println(humidity_event.relative_humidity);
-        u8g2->print(" %");
+        disp->setCursor(0, 48);
+        disp->print("Humidity:");
+        disp->println(humidity_event.relative_humidity);
+        disp->print(" %");
 
-        u8g2->sendBuffer();
+        disp->sendBuffer();
     }
 
     delay(1000);

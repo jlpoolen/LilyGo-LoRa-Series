@@ -447,24 +447,24 @@ void loop()
 
 void drawMain()
 {
-    if (u8g2) {
-        u8g2->clearBuffer();
-        u8g2->drawRFrame(0, 0, 128, 64, 5);
-        u8g2->setFont(u8g2_font_pxplusibmvga8_mr);
-        u8g2->setCursor(15, 20);
-        u8g2->print("RX:");
-        u8g2->setCursor(15, 35);
-        u8g2->print("SNR:");
-        u8g2->setCursor(15, 50);
-        u8g2->print("RSSI:");
+    if (disp) {
+        disp->clearBuffer();
+        disp->drawRFrame(0, 0, 128, 64, 5);
+        disp->setFont(u8g2_font_pxplusibmvga8_mr);
+        disp->setCursor(15, 20);
+        disp->print("RX:");
+        disp->setCursor(15, 35);
+        disp->print("SNR:");
+        disp->setCursor(15, 50);
+        disp->print("RSSI:");
 
-        u8g2->setFont(u8g2_font_crox1h_tr);
-        u8g2->setCursor( U8G2_HOR_ALIGN_RIGHT(payload.c_str()) - 21, 20 );
-        u8g2->print(payload);
-        u8g2->setCursor( U8G2_HOR_ALIGN_RIGHT(snr.c_str()) - 21, 35 );
-        u8g2->print(snr);
-        u8g2->setCursor( U8G2_HOR_ALIGN_RIGHT(rssi.c_str()) - 21, 50 );
-        u8g2->print(rssi);
-        u8g2->sendBuffer();
+        disp->setFont(u8g2_font_crox1h_tr);
+        disp->setCursor( U8G2_HOR_ALIGN_RIGHT(payload.c_str()) - 21, 20 );
+        disp->print(payload);
+        disp->setCursor( U8G2_HOR_ALIGN_RIGHT(snr.c_str()) - 21, 35 );
+        disp->print(snr);
+        disp->setCursor( U8G2_HOR_ALIGN_RIGHT(rssi.c_str()) - 21, 50 );
+        disp->print(rssi);
+        disp->sendBuffer();
     }
 }

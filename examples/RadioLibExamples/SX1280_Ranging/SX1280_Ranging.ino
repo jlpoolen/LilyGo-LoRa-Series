@@ -100,23 +100,23 @@ void loop()
 
     }
 
-    if (u8g2) {
-        u8g2->clearBuffer();
-        u8g2->drawRFrame(0, 0, 128, 64, 5);
+    if (disp) {
+        disp->clearBuffer();
+        disp->drawRFrame(0, 0, 128, 64, 5);
 
-        u8g2->setFont(u8g2_font_pxplusibmvga8_mr);
-        u8g2->setCursor(22, 25);
-        u8g2->print("Meters(raw):");
-        u8g2->setCursor(22, 40);
-        u8g2->print("STATE:");
+        disp->setFont(u8g2_font_pxplusibmvga8_mr);
+        disp->setCursor(22, 25);
+        disp->print("Meters(raw):");
+        disp->setCursor(22, 40);
+        disp->print("STATE:");
 
-        u8g2->setFont(u8g2_font_crox1h_tr);
-        u8g2->setCursor( U8G2_HOR_ALIGN_RIGHT(result.c_str()) - 21, 25 );
-        u8g2->print(result);
+        disp->setFont(u8g2_font_crox1h_tr);
+        disp->setCursor( U8G2_HOR_ALIGN_RIGHT(result.c_str()) - 21, 25 );
+        disp->print(result);
         String state = state == RADIOLIB_ERR_NONE ? "NONE" : String(state);
-        u8g2->setCursor( U8G2_HOR_ALIGN_RIGHT(state.c_str()) -  21, 40 );
-        u8g2->print(state);
-        u8g2->sendBuffer();
+        disp->setCursor( U8G2_HOR_ALIGN_RIGHT(state.c_str()) -  21, 40 );
+        disp->print(state);
+        disp->sendBuffer();
     }
 
 

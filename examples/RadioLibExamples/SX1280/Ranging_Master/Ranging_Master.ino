@@ -67,9 +67,9 @@ void setup()
         delay(1000);
     } else {
         Serial.println(F("No device responding"));
-        u8g2->clearBuffer();
-        u8g2->drawStr(0, 12, "No device responding");
-        u8g2->sendBuffer();
+        disp->clearBuffer();
+        disp->drawStr(0, 12, "No device responding");
+        disp->sendBuffer();
         while (1) {
             led_Flash(50, 50);                                 //long fast speed flash indicates device error
         }
@@ -89,19 +89,19 @@ void setup()
     Serial.println();
 
 #ifdef ENABLEDISPLAY
-    if (u8g2) {
+    if (disp) {
         Serial.println("Display Enabled");
-        u8g2->setFont(u8g2_font_unifont_t_chinese2);  // use chinese2 for all the glyphs of "你好世界"
-        u8g2->setFontDirection(0);
+        disp->setFont(u8g2_font_unifont_t_chinese2);  // use chinese2 for all the glyphs of "你好世界"
+        disp->setFontDirection(0);
         char buf[256];
-        u8g2->clearBuffer();
-        u8g2->drawStr(0, 12, "Ranging RAW Ready");
+        disp->clearBuffer();
+        disp->drawStr(0, 12, "Ranging RAW Ready");
         snprintf(buf, sizeof(buf), "Power:%.d dBm", RangingTXPower);
-        u8g2->drawStr(0, 12 * 2, buf);
+        disp->drawStr(0, 12 * 2, buf);
         snprintf(buf, sizeof(buf), "Cal: %d ", Calibration);
-        u8g2->drawStr(0, 12 * 3, buf);
+        disp->drawStr(0, 12 * 3, buf);
         snprintf(buf, sizeof(buf), "Adjust: %d ", distance_adjustment);
-        u8g2->sendBuffer();
+        disp->sendBuffer();
     }
 #endif
 
@@ -176,19 +176,19 @@ void loop()
             Serial.print(distance_average, 1);
 
 #ifdef ENABLEDISPLAY
-            if (u8g2) {
-                u8g2->clearBuffer();
+            if (disp) {
+                disp->clearBuffer();
                 char buf[256];
-                u8g2->drawStr(0, 12, "Rang_Master");
+                disp->drawStr(0, 12, "Rang_Master");
                 snprintf(buf, sizeof(buf), "Distance:%.2f m", distance_average);
-                u8g2->drawStr(0, 12 * 2, buf);
+                disp->drawStr(0, 12 * 2, buf);
                 snprintf(buf, sizeof(buf), "RSSI: %d dBm", RangingRSSI);
-                u8g2->drawStr(0, 12 * 3, buf);
+                disp->drawStr(0, 12 * 3, buf);
                 // snprintf(buf, sizeof(buf), "OK:  %d ", rangeings_valid);
-                // u8g2->drawStr(0, 12 * 4, buf);
+                // disp->drawStr(0, 12 * 4, buf);
                 // snprintf(buf, sizeof(buf), "Err:  %d ", rangeing_errors);
-                // u8g2->drawStr(0, 12 * 5, buf);
-                u8g2->sendBuffer();
+                // disp->drawStr(0, 12 * 5, buf);
+                disp->sendBuffer();
             }
 
 #endif

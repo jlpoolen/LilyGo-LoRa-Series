@@ -67,10 +67,10 @@ void setup()
     Serial.println(LT.getSetCalibrationValue());           //reads the calibratuion value currently set
     delay(2000);
 
-    if (u8g2) {
-        u8g2->clearBuffer();
-        u8g2->drawStr(0, 12, "Rang_Slave");
-        u8g2->sendBuffer();
+    if (disp) {
+        disp->clearBuffer();
+        disp->drawStr(0, 12, "Rang_Slave");
+        disp->sendBuffer();
     }
 }
 

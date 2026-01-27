@@ -5,7 +5,7 @@
   How to overwrite previous text with a new text.
   How to avoid the buffer clear command.
 
-  Universal 8bit Graphics Library (https://github.com/olikraus/u8g2/)
+  Universal 8bit Graphics Library (https://github.com/olikraus/disp/)
 
   Copyright (c) 2016, olikraus@gmail.com
   All rights reserved.
@@ -36,19 +36,19 @@
 
 
   Usually, a sequence like this is used:
-  u8g2->clearBuffer();                   // clear the internal memory
-  u8g2->setFont(u8g2_font_ncenB08_tr);   // choose a suitable font
-  u8g2->setCursor(0,20)              // set write position
-  u8g2->print("Hello World!");           // write something to the internal memory
-  u8g2->sendBuffer();                    // transfer internal memory to the display
+  disp->clearBuffer();                   // clear the internal memory
+  disp->setFont(u8g2_font_ncenB08_tr);   // choose a suitable font
+  disp->setCursor(0,20)              // set write position
+  disp->print("Hello World!");           // write something to the internal memory
+  disp->sendBuffer();                    // transfer internal memory to the display
 
   In order to speed up the display content rendering for any modified text,
   we could drop the clearBuffer command and just overwrite the previous string:
 
-  u8g2->setFont(u8g2_font_ncenB08_tr);   // choose a suitable font
-  u8g2->setCursor(0,20)              // set write position
-  u8g2->print("hello there");            // write something to the internal memory
-  u8g2->sendBuffer();                    // transfer internal memory to the display
+  disp->setFont(u8g2_font_ncenB08_tr);   // choose a suitable font
+  disp->setCursor(0,20)              // set write position
+  disp->print("hello there");            // write something to the internal memory
+  disp->sendBuffer();                    // transfer internal memory to the display
 
   This will only work if:
   - Background is drawn
@@ -59,11 +59,11 @@
   To draw the background: use font mode 0
   To ensure that all glyphs have the same height, use h or m fonts.
 
-  u8g2->setFontMode(0);              // write solid glyphs
-  u8g2->setFont(u8g2_font_ncenB08_hr);   // choose a suitable h font
-  u8g2->setCursor(0,20)              // set write position
-  u8g2->print("hello there  ");          // use extra spaces here
-  u8g2->sendBuffer();                    // transfer internal memory to the display
+  disp->setFontMode(0);              // write solid glyphs
+  disp->setFont(u8g2_font_ncenB08_hr);   // choose a suitable h font
+  disp->setCursor(0,20)              // set write position
+  disp->print("hello there  ");          // use extra spaces here
+  disp->sendBuffer();                    // transfer internal memory to the display
 
 
 */
@@ -97,7 +97,7 @@ uint32_t lcg_rnd(void)
 void setup(void)
 {
     setupBoards();
-    if (!u8g2) {
+    if (!disp) {
         Serial.println("No find SH1106 display!Please check whether the connection is normal");
         while (1);
     }
@@ -124,24 +124,24 @@ void draw(int is_blank)
         s[3] = '\0';
 
         // print number
-        u8g2->setCursor(0, 15);
-        u8g2->print("Number: ");
+        disp->setCursor(0, 15);
+        disp->print("Number: ");
         if ( is_blank )
-            u8g2->print("       ");
-        u8g2->setCursor(70, 15);
-        u8g2->print(n);
+            disp->print("       ");
+        disp->setCursor(70, 15);
+        disp->print(n);
 
 
         // print string
-        u8g2->setCursor(0, 30);
-        u8g2->print("Text: ");
-        u8g2->setCursor(70, 30);
-        u8g2->print(s);
+        disp->setCursor(0, 30);
+        disp->print("Text: ");
+        disp->setCursor(70, 30);
+        disp->print(s);
         if ( is_blank )
-            u8g2->print("        ");
+            disp->print("        ");
 
         // make the result visible
-        u8g2->sendBuffer();
+        disp->sendBuffer();
 
         // delay, so that the user can see the result
         delay(200);
@@ -150,116 +150,116 @@ void draw(int is_blank)
 
 void draw_m1_t()
 {
-    u8g2->clearBuffer();
+    disp->clearBuffer();
 
-    u8g2->setFontMode(1);
-    u8g2->setFont(u8g2_font_cu12_tr);
+    disp->setFontMode(1);
+    disp->setFont(u8g2_font_cu12_tr);
 
-    u8g2->setCursor(0, 15);
-    u8g2->print(F("setFontMode(1);"));
-    u8g2->setCursor(0, 30);
-    u8g2->print(F("setFont(..._tr);"));
-    u8g2->setCursor(0, 55);
-    u8g2->print(F("Very Bad"));
+    disp->setCursor(0, 15);
+    disp->print(F("setFontMode(1);"));
+    disp->setCursor(0, 30);
+    disp->print(F("setFont(..._tr);"));
+    disp->setCursor(0, 55);
+    disp->print(F("Very Bad"));
 
-    u8g2->sendBuffer();
+    disp->sendBuffer();
     delay(INFO_SCREEN_DELAY);
 
-    u8g2->setFontMode(1);
-    u8g2->setFont(u8g2_font_cu12_tr);
-    u8g2->clearBuffer();                   // clear the internal memory once
+    disp->setFontMode(1);
+    disp->setFont(u8g2_font_cu12_tr);
+    disp->clearBuffer();                   // clear the internal memory once
     draw(0);
 }
 
 void draw_m0_t()
 {
-    u8g2->clearBuffer();
+    disp->clearBuffer();
 
-    u8g2->setFontMode(1);
-    u8g2->setFont(u8g2_font_cu12_tr);
+    disp->setFontMode(1);
+    disp->setFont(u8g2_font_cu12_tr);
 
-    u8g2->setCursor(0, 15);
-    u8g2->print(F("setFontMode(0);"));
-    u8g2->setCursor(0, 30);
-    u8g2->print(F("setFont(.._tr);"));
-    u8g2->setCursor(0, 55);
-    u8g2->print(F("Wrong"));
+    disp->setCursor(0, 15);
+    disp->print(F("setFontMode(0);"));
+    disp->setCursor(0, 30);
+    disp->print(F("setFont(.._tr);"));
+    disp->setCursor(0, 55);
+    disp->print(F("Wrong"));
 
-    u8g2->sendBuffer();
+    disp->sendBuffer();
     delay(INFO_SCREEN_DELAY);
 
-    u8g2->setFontMode(0);
-    u8g2->setFont(u8g2_font_cu12_tr);
-    u8g2->clearBuffer();                   // clear the internal memory once
+    disp->setFontMode(0);
+    disp->setFont(u8g2_font_cu12_tr);
+    disp->clearBuffer();                   // clear the internal memory once
     draw(0);
 }
 
 void draw_m1_h()
 {
-    u8g2->clearBuffer();
+    disp->clearBuffer();
 
-    u8g2->setFontMode(1);
-    u8g2->setFont(u8g2_font_cu12_tr);
+    disp->setFontMode(1);
+    disp->setFont(u8g2_font_cu12_tr);
 
-    u8g2->setCursor(0, 15);
-    u8g2->print(F("setFontMode(0);"));
-    u8g2->setCursor(0, 30);
-    u8g2->print(F("setFont(.._hr);"));
-    u8g2->setCursor(0, 55);
-    u8g2->print(F("Still bad"));
+    disp->setCursor(0, 15);
+    disp->print(F("setFontMode(0);"));
+    disp->setCursor(0, 30);
+    disp->print(F("setFont(.._hr);"));
+    disp->setCursor(0, 55);
+    disp->print(F("Still bad"));
 
-    u8g2->sendBuffer();
+    disp->sendBuffer();
     delay(INFO_SCREEN_DELAY);
 
-    u8g2->setFontMode(1);
-    u8g2->setFont(u8g2_font_cu12_hr);
-    u8g2->clearBuffer();                   // clear the internal memory once
+    disp->setFontMode(1);
+    disp->setFont(u8g2_font_cu12_hr);
+    disp->clearBuffer();                   // clear the internal memory once
     draw(0);
 }
 
 void draw_m0_h()
 {
-    u8g2->clearBuffer();
+    disp->clearBuffer();
 
-    u8g2->setFontMode(1);
-    u8g2->setFont(u8g2_font_cu12_tr);
+    disp->setFontMode(1);
+    disp->setFont(u8g2_font_cu12_tr);
 
-    u8g2->setCursor(0, 15);
-    u8g2->print(F("setFontMode(0);"));
-    u8g2->setCursor(0, 30);
-    u8g2->print(F("setFont(.._hr);"));
-    u8g2->setCursor(0, 55);
-    u8g2->print(F("Almost ok"));
+    disp->setCursor(0, 15);
+    disp->print(F("setFontMode(0);"));
+    disp->setCursor(0, 30);
+    disp->print(F("setFont(.._hr);"));
+    disp->setCursor(0, 55);
+    disp->print(F("Almost ok"));
 
-    u8g2->sendBuffer();
+    disp->sendBuffer();
     delay(INFO_SCREEN_DELAY);
 
-    u8g2->setFontMode(0);
-    u8g2->setFont(u8g2_font_cu12_hr);
-    u8g2->clearBuffer();                   // clear the internal memory once
+    disp->setFontMode(0);
+    disp->setFont(u8g2_font_cu12_hr);
+    disp->clearBuffer();                   // clear the internal memory once
     draw(0);
 }
 
 void draw_m0_h_with_extra_blank()
 {
-    u8g2->clearBuffer();
+    disp->clearBuffer();
 
-    u8g2->setFontMode(1);
-    u8g2->setFont(u8g2_font_cu12_tr);
+    disp->setFontMode(1);
+    disp->setFont(u8g2_font_cu12_tr);
 
-    u8g2->setCursor(0, 15);
-    u8g2->print(F("setFontMode(0);"));
-    u8g2->setCursor(0, 30);
-    u8g2->print(F("setFont(.._hr);"));
-    u8g2->setCursor(0, 55);
-    u8g2->print(F("Extra blank --> Ok"));
+    disp->setCursor(0, 15);
+    disp->print(F("setFontMode(0);"));
+    disp->setCursor(0, 30);
+    disp->print(F("setFont(.._hr);"));
+    disp->setCursor(0, 55);
+    disp->print(F("Extra blank --> Ok"));
 
-    u8g2->sendBuffer();
+    disp->sendBuffer();
     delay(INFO_SCREEN_DELAY);
 
-    u8g2->setFontMode(0);
-    u8g2->setFont(u8g2_font_cu12_hr);
-    u8g2->clearBuffer();                   // clear the internal memory once
+    disp->setFontMode(0);
+    disp->setFont(u8g2_font_cu12_hr);
+    disp->clearBuffer();                   // clear the internal memory once
     draw(1);
 }
 
@@ -268,16 +268,16 @@ void loop(void)
 {
 
     // This problem applies only to full buffer mode
-    u8g2->clearBuffer();
-    u8g2->setFontMode(1);
-    u8g2->setFont(u8g2_font_cu12_tr);
-    u8g2->setCursor(0, 15);
-    u8g2->print(F("Problems with"));
-    u8g2->setCursor(0, 30);
-    u8g2->print(F("full buffer mode"));
-    u8g2->setCursor(0, 45);
-    u8g2->print(F("and skipped clear."));
-    u8g2->sendBuffer();
+    disp->clearBuffer();
+    disp->setFontMode(1);
+    disp->setFont(u8g2_font_cu12_tr);
+    disp->setCursor(0, 15);
+    disp->print(F("Problems with"));
+    disp->setCursor(0, 30);
+    disp->print(F("full buffer mode"));
+    disp->setCursor(0, 45);
+    disp->print(F("and skipped clear."));
+    disp->sendBuffer();
     delay(INFO_SCREEN_DELAY);
 
 

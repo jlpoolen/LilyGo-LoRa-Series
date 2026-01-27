@@ -2,9 +2,9 @@
 
   PrintUTF8.ino
 
-  Use the (Arduino compatible) u8g2 function "print"  to draw a text.
+  Use the (Arduino compatible) disp function "print"  to draw a text.
 
-  Universal 8bit Graphics Library (https://github.com/olikraus/u8g2/)
+  Universal 8bit Graphics Library (https://github.com/olikraus/disp/)
 
   Copyright (c) 2016, olikraus@gmail.com
   All rights reserved.
@@ -42,23 +42,23 @@
 void setup(void)
 {
     setupBoards();
-    if (!u8g2) {
+    if (!disp) {
         Serial.println("No find SH1106 display!Please check whether the connection is normal");
         while (1);
     }
-    u8g2->enableUTF8Print();       // enable UTF8 support for the Arduino print() function
+    disp->enableUTF8Print();       // enable UTF8 support for the Arduino print() function
 }
 
 void loop(void)
 {
-    u8g2->setFont(u8g2_font_unifont_t_chinese2);  // use chinese2 for all the glyphs of "你好世界"
-    u8g2->setFontDirection(0);
-    u8g2->clearBuffer();
-    u8g2->setCursor(0, 15);
-    u8g2->print("Hello World!");
-    u8g2->setCursor(0, 40);
-    u8g2->print("你好世界");       // Chinese "Hello World"
-    u8g2->sendBuffer();
+    disp->setFont(u8g2_font_unifont_t_chinese2);  // use chinese2 for all the glyphs of "你好世界"
+    disp->setFontDirection(0);
+    disp->clearBuffer();
+    disp->setCursor(0, 15);
+    disp->print("Hello World!");
+    disp->setCursor(0, 40);
+    disp->print("你好世界");       // Chinese "Hello World"
+    disp->sendBuffer();
 
     delay(1000);
 }
