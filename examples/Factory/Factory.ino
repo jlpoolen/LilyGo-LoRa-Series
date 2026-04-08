@@ -42,9 +42,10 @@
 #include <Adafruit_BME280.h>
 #include <SensorQMI8658.hpp>
 #include <SensorQMC6310.hpp>
+#include <SensorQMC6309.hpp>
 #include <SensorPCF8563.hpp>
 
-SensorQMC6310  qmc;
+MagnetometerBase  *magnetometer = nullptr;
 SensorQMI8658  qmi;
 SensorPCF8563  rtc;
 Adafruit_BME280 bme;
@@ -565,7 +566,7 @@ void setup()
         Serial.println(info.wifi_sta_disconnected.reason);
     }, WiFiEvent_t::ARDUINO_EVENT_WIFI_STA_DISCONNECTED);
 
-    setupBoards(true);
+    setupBoards(false);
 
     setupBLE();
 
@@ -1104,7 +1105,7 @@ void hwProbe(OLEDDisplay *display, OLEDDisplayUiState *state, int16_t x, int16_t
     display->drawString(62 + x, 51 + y, "OSC");
 
     display->setTextAlignment(TEXT_ALIGN_RIGHT);
-    display->drawString(display->width()  + x,  3  + y, ((deviceOnline & QMC6310U_ONLINE) || (deviceOnline & QMC6310N_ONLINE)) ? "+" : "-");
+    display->drawString(display->width()  + x,  3  + y, ((deviceOnline & QMC6310U_ONLINE) || (deviceOnline & QMC6310N_ONLINE) || (deviceOnline & QMC6309_ONLINE)) ? "+" : "-");
     display->drawString(display->width()  + x,  15 + y, (deviceOnline & BME280_ONLINE ) || (deviceOnline & BMP280_ONLINE ) ? "+" : "-");
     display->drawString(display->width()  + x,  27 + y, (deviceOnline & PSRAM_ONLINE )   ? "+" : "-");
     display->drawString(display->width()  + x,  39 + y, (deviceOnline & SDCARD_ONLINE )  ? "+" : "-");
@@ -1386,9 +1387,15 @@ int drawCompass(OLEDDisplay *display, int16_t x, int16_t y, float magX, float ma
 void getMagData(float *x, float *y)
 {
     float z = 0;
-    if (qmc.isDataReady()) {
-        qmc.readData();
-        qmc.getMag(*x, *y, z);
+    if (!magnetometer) {
+        Serial.println("Magnetometer not initialized");
+        return;
+    }
+    MagnetometerData data;
+    if (magnetometer->readData(data)) {
+        *x = data.magnetic_field.x;
+        *y = data.magnetic_field.y;
+        Serial.printf("Magnetometer data read: x=%.2f, y=%.2f, z=%.2f\n", *x, *y, z);
     }
 }
 
@@ -1397,8 +1404,13 @@ void imuInfo(OLEDDisplay *display, OLEDDisplayUiState *disp_state, int16_t x, in
     static float  magX = 0, magY = 0;
     static int angle = 0;
     static float roll, pitch, heading;
+    static uint32_t interval = 0;
 
-    getMagData(&magX, &magY);
+    if (millis() - interval > 100) {
+        getMagData(&magX, &magY);
+        interval = millis();
+    }
+
     angle = drawCompass(display, x, y, magX, magY);
 
     display->setFont(Roboto_Mono_Medium_12);
@@ -1431,20 +1443,101 @@ void imuInfo(OLEDDisplay *display, OLEDDisplayUiState *disp_state, int16_t x, in
 static void beginSensor()
 {
     extern uint8_t mag_address;
+
     // PMU and RTC share I2C bus
     if (!rtc.begin(PMU_WIRE_PORT, I2C_SDA, I2C_SCL)) {
         Serial.println("Failed to find PCF8563 - check your wiring!");
     }
-    if (!qmc.begin(Wire, mag_address, I2C_SDA, I2C_SCL)) {
-        Serial.println("Failed to find QMC6310 - check your wiring!");
-    } else {
-        qmc.configMagnetometer(
-            SensorQMC6310::MODE_CONTINUOUS,
-            SensorQMC6310::RANGE_8G,
-            SensorQMC6310::DATARATE_200HZ,
-            SensorQMC6310::OSR_1,
-            SensorQMC6310::DSR_1);
+
+    // The desired output data rate in Hz.  Allowed values are 1.0, 10.0, 50.0, 100.0 and 200.0HZ.
+    float data_rate_hz = 200.0f;
+    // op_mode: Allowed values are SUSPEND, NORMAL, SINGLE_MEASUREMENT, CONTINUOUS_MEASUREMENT
+    OperationMode op_mode = OperationMode::CONTINUOUS_MEASUREMENT;
+    // full_scale: Allowed values are  FS_8G, FS_16G ,FS_32G
+    MagFullScaleRange full_scale = MagFullScaleRange::FS_8G;
+    // over_sample_ratio: Allowed values are OSR_1, OSR_2, OSR_4, OSR_8
+    MagOverSampleRatio over_sample_ratio = MagOverSampleRatio::OSR_1;
+    // down_sample_ratio: QMC6309 does not support downsampling rate settings; this parameter is ignored.
+    MagDownSampleRatio down_sample_ratio = MagDownSampleRatio::DSR_1;
+
+    Serial.printf("Probing magnetometer at address 0x%02X...\n", mag_address);
+    if (magnetometer == nullptr && mag_address == QMC6310U_SLAVE_ADDRESS) {
+        magnetometer = new SensorQMC6310();
+        if (!static_cast<SensorQMC6310*>(magnetometer)->begin(Wire, QMC6310U_SLAVE_ADDRESS, I2C_SDA, I2C_SCL)) {
+            Serial.println("Failed to find QMC6310U - check your wiring!");
+            delete magnetometer;
+            magnetometer = nullptr;
+        } else {
+            Serial.println("QMC6310U found!");
+            // The desired output data rate in Hz.  Allowed values are 10.0, 50.0, 100.0 and 200.0HZ.
+            data_rate_hz = 10.0f;
+            // op_mode: Allowed values are SUSPEND, NORMAL, SINGLE_MEASUREMENT, CONTINUOUS_MEASUREMENT
+            op_mode = OperationMode::CONTINUOUS_MEASUREMENT;
+            // full_scale: Allowed values are FS_2G, FS_8G, FS_12G ,FS_30G
+            full_scale = MagFullScaleRange::FS_8G;
+            // over_sample_ratio: Allowed values are OSR_1, OSR_2, OSR_4, OSR_8
+            over_sample_ratio = MagOverSampleRatio::OSR_1;
+            // down_sample_ratio: Allowed values are DSR_1, DSR_2, DSR_4, DSR_8
+            down_sample_ratio = MagDownSampleRatio::DSR_1;
+        }
     }
+
+    if (magnetometer == nullptr && mag_address == QMC6310N_SLAVE_ADDRESS) {
+        magnetometer = new SensorQMC6310();
+        if (!static_cast<SensorQMC6310*>(magnetometer)->begin(Wire, QMC6310N_SLAVE_ADDRESS, I2C_SDA, I2C_SCL)) {
+            Serial.println("Failed to find QMC6310 - check your wiring!");
+            delete magnetometer;
+            magnetometer = nullptr;
+        } else {
+            Serial.println("QMC6310N found!");
+            // The desired output data rate in Hz.  Allowed values are 10.0, 50.0, 100.0 and 200.0HZ.
+            data_rate_hz = 10.0f;
+            // op_mode: Allowed values are SUSPEND, NORMAL, SINGLE_MEASUREMENT, CONTINUOUS_MEASUREMENT
+            op_mode = OperationMode::CONTINUOUS_MEASUREMENT;
+            // full_scale: Allowed values are FS_2G, FS_8G, FS_12G ,FS_30G
+            full_scale = MagFullScaleRange::FS_8G;
+            // over_sample_ratio: Allowed values are OSR_1, OSR_2, OSR_4, OSR_8
+            over_sample_ratio = MagOverSampleRatio::OSR_1;
+            // down_sample_ratio: Allowed values are DSR_1, DSR_2, DSR_4, DSR_8
+            down_sample_ratio = MagDownSampleRatio::DSR_1;
+        }
+    }
+
+    if (magnetometer == nullptr && mag_address == QMC6309_SLAVE_ADDRESS) {
+        magnetometer = new SensorQMC6309();
+        if (!static_cast<SensorQMC6309*>(magnetometer)->begin(Wire, QMC6309_SLAVE_ADDRESS, I2C_SDA, I2C_SCL)) {
+            Serial.println("Failed to find QMC6309 - check your wiring!");
+            delete magnetometer;
+            magnetometer = nullptr;
+        } else {
+            Serial.println("QMC6309 found!");
+            // The desired output data rate in Hz.  Allowed values are 1.0, 10.0, 50.0, 100.0 and 200.0HZ.
+            data_rate_hz = 10.0f;
+            // op_mode: Allowed values are SUSPEND, NORMAL, SINGLE_MEASUREMENT, CONTINUOUS_MEASUREMENT
+            op_mode = OperationMode::CONTINUOUS_MEASUREMENT;
+            // full_scale: Allowed values are  FS_8G, FS_16G ,FS_32G
+            full_scale = MagFullScaleRange::FS_8G;
+            // over_sample_ratio: Allowed values are OSR_1, OSR_2, OSR_4, OSR_8
+            over_sample_ratio = MagOverSampleRatio::OSR_1;
+            // down_sample_ratio: QMC6309 does not support downsampling rate settings; this parameter is ignored.
+            down_sample_ratio = MagDownSampleRatio::DSR_1;
+        }
+    }
+
+    if (magnetometer) {
+        /* Config Magnetometer */
+        if (magnetometer->configMagnetometer(
+                    op_mode,
+                    full_scale,
+                    data_rate_hz,
+                    over_sample_ratio,
+                    down_sample_ratio)) {
+            Serial.println("Magnetometer configured successfully.");
+        } else {
+            Serial.println("Magnetometer configuration failed.");
+        }
+    }
+
     extern uint8_t bme280_address;
     if (!bme.begin(bme280_address)) {
         Serial.println("Failed to find BME280 - check your wiring!");
