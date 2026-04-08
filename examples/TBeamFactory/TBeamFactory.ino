@@ -554,7 +554,9 @@ void radioTx(OLEDDisplay *display, OLEDDisplayUiState *state, int16_t x, int16_t
                                 0x89, 0xAB, 0xCD, 0xEF};
               int state = radio.startTransmit(byteArr, 8);
             */
+#ifdef BOARD_LED
             digitalWrite(BOARD_LED, 1 - digitalRead(BOARD_LED));
+#endif
         }
 
         Serial.println("Radio TX done !");
@@ -577,7 +579,9 @@ void radioRx(OLEDDisplay *display, OLEDDisplayUiState *state, int16_t x, int16_t
     if (transmittedFlag) {
         Serial.println("Radio RX done !");
 
+#ifdef BOARD_LED
         digitalWrite(BOARD_LED, 1 - digitalRead(BOARD_LED));
+#endif
 
         // reset flag
         transmittedFlag = false;

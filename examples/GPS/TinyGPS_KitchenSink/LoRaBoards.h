@@ -58,7 +58,8 @@ enum {
     QMC6310N_ONLINE      = _BV(11),
     QMI8658_ONLINE      = _BV(12),
     PCF8563_ONLINE      = _BV(13),
-    OSC32768_ONLINE      = _BV(14)
+    OSC32768_ONLINE      = _BV(14),
+    QMC6309_ONLINE      = _BV(15),
 };
 
 

@@ -996,6 +996,11 @@ void scanDevices(TwoWire *w)
                 }
             }
             break;
+            case 0x7C:
+                Serial.printf("\tFound QMC6309 Sensor at address 0x%02X\n", addr);
+                mag_address = addr;
+                deviceOnline |= QMC6309_ONLINE;
+                break;
             case 0x51:
                 Serial.printf("\tFound PCF8563 RTC at address 0x%02X\n", addr);
                 deviceOnline |= PCF8563_ONLINE;
