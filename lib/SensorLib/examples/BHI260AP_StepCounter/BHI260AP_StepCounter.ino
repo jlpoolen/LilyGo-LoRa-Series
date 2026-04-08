@@ -134,22 +134,22 @@ bool force_update_flash_firmware = true;
 #endif
 
 #ifdef USING_SENSOR_IRQ_METHOD
-bool isReadyFlag = false;
+volatile bool isInterruptTriggered = false;
 
 void dataReadyISR()
 {
-    isReadyFlag = true;
+    isInterruptTriggered = true;
 }
 #endif /*USING_SENSOR_IRQ_METHOD*/
 
 #ifndef USING_DATA_HELPER
-void step_detector_process_callback(uint8_t  sensor_id, uint8_t *data_ptr, uint32_t len, uint64_t *timestamp, void *user_data)
+void step_detector_process_callback(uint8_t  sensor_id, const uint8_t *data_ptr, uint32_t len, uint64_t *timestamp, void *user_data)
 {
     Serial.print(bhy.getSensorName(sensor_id));
     Serial.println(" detected.");
 }
 
-void step_counter_process_callback(uint8_t  sensor_id, uint8_t *data_ptr, uint32_t len, uint64_t *timestamp, void *user_data)
+void step_counter_process_callback(uint8_t  sensor_id, const uint8_t *data_ptr, uint32_t len, uint64_t *timestamp, void *user_data)
 {
     Serial.print(bhy.getSensorName(sensor_id));
     Serial.print(":");
@@ -158,7 +158,7 @@ void step_counter_process_callback(uint8_t  sensor_id, uint8_t *data_ptr, uint32
 #endif
 
 // Firmware update progress callback
-void progress_callback(void *user_data, uint32_t total, uint32_t transferred)
+void progress_callback(uint32_t total, uint32_t transferred, void *user_data)
 {
     float progress = (float)transferred / total * 100;
     Serial.print("Upload progress: ");
@@ -221,10 +221,18 @@ void setup()
 
     // Output all sensors info to Serial
     BoschSensorInfo info = bhy.getSensorInfo();
-#ifdef PLATFORM_HAS_PRINTF
-    info.printInfo(Serial);
+    
+#ifdef ARDUINO
+    ArduinoStreamPrinter printer(Serial);
+    info.printInfo(printer);
 #else
-    info.printInfo();
+    info.printInfo([](const char *format, ...) -> int {
+        va_list args;
+        va_start(args, format);
+        int result = vprintf(format, args);
+        va_end(args);
+        return result;
+    });
 #endif
 
     // The stepcount sensor will only report when it changes, so the value is 0 ~ 1
@@ -236,12 +244,12 @@ void setup()
     stepCounter.enable(sample_rate, report_latency_ms);
 #else
     // Enable Step detector
-    bhy.configure(SensorBHI260AP::STEP_DETECTOR, sample_rate, report_latency_ms);
+    bhy.configure(BoschSensorID::STEP_DETECTOR, sample_rate, report_latency_ms);
     // Enable Step counter
-    bhy.configure(SensorBHI260AP::STEP_COUNTER, sample_rate, report_latency_ms);
+    bhy.configure(BoschSensorID::STEP_COUNTER, sample_rate, report_latency_ms);
     // Set the number of steps to detect the callback function
-    bhy.onResultEvent(SensorBHI260AP::STEP_DETECTOR, step_detector_process_callback);
-    bhy.onResultEvent(SensorBHI260AP::STEP_COUNTER, step_counter_process_callback);
+    bhy.onResultEvent(BoschSensorID::STEP_DETECTOR, step_detector_process_callback);
+    bhy.onResultEvent(BoschSensorID::STEP_COUNTER, step_counter_process_callback);
 #endif
 
 #ifdef USING_SENSOR_IRQ_METHOD
@@ -263,8 +271,8 @@ void loop()
     uint32_t ns;
 
 #ifdef USING_SENSOR_IRQ_METHOD
-    if (isReadyFlag) {
-        isReadyFlag = false;
+    if (isInterruptTriggered) {
+        isInterruptTriggered = false;
 #endif /*USING_SENSOR_IRQ_METHOD*/
 
         /* If the interrupt is connected to the sensor and BHI260_IRQ is not equal to -1,

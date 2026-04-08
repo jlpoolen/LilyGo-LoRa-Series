@@ -29,70 +29,120 @@
  */
 #pragma once
 
-#include "REG/GT9895Constants.h"
 #include "TouchDrvInterface.hpp"
 
-class TouchDrvGT9895 :  public TouchDrvInterface, public GT9895Constants
+#define GT9895_SLAVE_ADDRESS_H              (0x14)
+#define GT9895_SLAVE_ADDRESS_L              (0x5D)
+
+class TouchDrvGT9895 :  public TouchDrvInterface
 {
 public:
-    TouchDrvGT9895();
-    ~TouchDrvGT9895();
+    using TouchDrvInterface::getPoint;
+    /**
+     * @brief  Constructor for the touch driver
+     * @retval None
+     */
+    TouchDrvGT9895() = default;
 
-#if defined(ARDUINO)
-    bool begin(TwoWire &wire, uint8_t address = GT9895_SLAVE_ADDRESS_L, int sda = -1, int scl = -1);
-#elif defined(ESP_PLATFORM)
-#if defined(USEING_I2C_LEGACY)
-    bool begin(i2c_port_t port_num, uint8_t addr = GT9895_SLAVE_ADDRESS_L, int sda = -1, int scl = -1);
-#else
-    bool begin(i2c_master_bus_handle_t handle, uint8_t addr = GT9895_SLAVE_ADDRESS_L);
-#endif  //ESP_PLATFORM
-#endif  //ARDUINO
+    /**
+     * @brief  Destructor for the touch driver
+     * @retval None
+     */
+    ~TouchDrvGT9895() = default;
 
-    bool begin(SensorCommCustom::CustomCallback callback,
-               SensorCommCustomHal::CustomHalCallback hal_callback,
-               uint8_t addr = GT9895_SLAVE_ADDRESS_L);
+    /**
+     * @brief  Reset the touch driver
+     * @note   This function will reset the touch driver by toggling the reset pin.
+     * @retval None
+     */
+    void reset() override;
 
-    void deinit();
-    void reset();
-    void sleep();
-    void wakeup();
-    void idle();
+    /**
+    * @brief Puts the touch driver to sleep
+    * @note This function puts the touch driver into sleep mode.
+    *       If the device does not have a reset pin connected, it cannot be woken up after being put
+    *       into sleep mode and must be powered on again.
+    * @retval None
+    */
+    void sleep() override;
 
-    uint8_t getSupportTouchPoint();
-    uint8_t getPoint(int16_t *x_array, int16_t *y_array, uint8_t size = 1);
-    bool isPressed();
+    /**
+     * @brief  Wake up the touch driver
+     * @note   This function will wake up the touch driver from sleep mode.
+     * @retval None
+     */
+    void wakeup() override;
 
-    uint32_t getChipID();
-    bool getResolution(int16_t *x, int16_t *y);
+    /**
+    * @brief  Get the touch points
+    * @note   This function will retrieve the touch points from the touch driver.
+    *         TouchPoints is configured with a 5-point touch point buffer by default,
+    *         so it can return touch data from a maximum of 5 points. Although the GT9895
+    *         supports 10-point touch
+    * @retval A reference to the touch points.
+    */
+    const TouchPoints &getTouchPoints() override;
 
-    const char *getModelName();
+    /**
+     * @brief  Check if the touch point is pressed
+     * @note   This function will check if the touch point is currently pressed.
+     * @retval True if the touch point is pressed, false otherwise.
+     */
+    bool isPressed() override;
 
-    void setGpioCallback(CustomMode mode_cb,
-                         CustomWrite write_cb,
-                         CustomRead read_cb);
+    /**
+     * @brief  Get the model name
+     * @note   This function will retrieve the model name from the touch driver.
+     * @retval The model name.
+     */
+    const char *getModelName() override;
 
 private:
 
-    int is_risk_data(const uint8_t *data, int size);
-    int checksum_cmp(const uint8_t *data, int size, int mode);
+    enum CheckSumMode {
+        CHECKSUM_MODE_U8_LE,
+        CHECKSUM_MODE_U16_LE,
+    };
 
-    int readVersion(ChipFirmwareVersion *version);
-    int convertChipInfo(ChipInfo *info, const uint8_t *data);
-    void printChipInfo(ChipInfo *ic_info);
-    int readChipInfo(ChipInfo *ic_info);
+    bool initImpl(uint8_t addr) override;
 
+    /**
+     * @brief  Compare the checksum of the data
+     * @note   This function will compare the checksum of the data with the expected value.
+     * @param  *data: Pointer to the data buffer
+     * @param  size: Size of the data buffer
+     * @param  mode: Checksum mode
+     * @retval 0 if the checksum is valid, -1 if it is invalid
+     */
+    int checksum(const uint8_t *data, int size, CheckSumMode mode);
+
+    /**
+     * @brief  Get chip pid
+     * @note   This function will retrieve the chip pid from the touch driver.
+     * @retval The chip pid.
+     */
+    uint32_t getChipPID();
+
+    /**
+     * @brief  Clear the touch driver status
+     * @note   This function will clear the touch driver status.
+     * @retval None
+     */
     void clearStatus();
-    int getTouchData( uint8_t *pre_buf, uint32_t pre_buf_len);
-
-    bool initImpl();
 
 protected:
-    std::unique_ptr<SensorCommBase> comm;
-    std::unique_ptr<SensorHal> hal;
 
-    ChipTsEvent          _ts_event;
-    ChipFirmwareVersion  _version;
-    ChipInfo             _ic_info;
+    static constexpr uint8_t MAX_FINGER_NUM             = (10);
+    static constexpr uint8_t IRQ_EVENT_HEAD_LEN         = (8);
+    static constexpr uint8_t BYTES_PER_POINT            = (8);
+    static constexpr uint8_t COORDS_DATA_CHECKSUM_SIZE  = (2);
+
+    static constexpr uint8_t POINT_TYPE_STYLUS_HOVER    = (1);
+    static constexpr uint8_t POINT_TYPE_STYLUS          = (3);
+
+    static constexpr uint32_t REG_FW_VERSION = (0x00010014u);
+    static constexpr uint32_t REG_INFO       = (0x00010070u);
+    static constexpr uint32_t REG_CMD        = (0x00010174u);
+    static constexpr uint32_t REG_POINT      = (0x00010308u);
+    static constexpr uint32_t CHIP_PID       = (0x9895);
 };
-
-

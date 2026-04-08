@@ -33,25 +33,22 @@
 #include "TouchDrvGT911.hpp"
 
 #ifndef TOUCH_SDA
-#define TOUCH_SDA  2
+#define TOUCH_SDA  18
 #endif
 
 #ifndef TOUCH_SCL
-#define TOUCH_SCL  3
+#define TOUCH_SCL  8
 #endif
 
 #ifndef TOUCH_IRQ
-#define TOUCH_IRQ  1
+#define TOUCH_IRQ  16
 #endif
 
 #ifndef TOUCH_RST
-#define TOUCH_RST  10
+#define TOUCH_RST  -1
 #endif
 
 TouchDrvGT911 touch;
-int16_t x[5], y[5];
-
-
 
 void setup()
 {
@@ -61,7 +58,7 @@ void setup()
     // If the reset pin and interrupt pin can be controlled by GPIO, the device address can be set arbitrarily
     // If the interrupt and reset pins are not connected, you can pass in the -1 parameter and the library will automatically determine the address.
     touch.setPins(TOUCH_RST, TOUCH_IRQ);
-    if (!touch.begin(Wire, GT911_SLAVE_ADDRESS_L, TOUCH_SDA, TOUCH_SCL)) {
+    if (!touch.begin(Wire, GT911_SLAVE_ADDRESS_UNKNOWN, TOUCH_SDA, TOUCH_SCL)) {
         while (1) {
             Serial.println("Failed to find GT911 - check your wiring!");
             delay(1000);
@@ -78,7 +75,7 @@ void setup()
 
     /*
     *   GT911 Interrupt mode ,It is not recommended to modify any touch settings
-    *   Please do not modify the touch interrupt mode without a touch screen configuration file, 
+    *   Please do not modify the touch interrupt mode without a touch screen configuration file,
     *   otherwise the touch screen may become unusable.
     * * */
     // Low level when idle, converts to high level when touched
@@ -93,26 +90,31 @@ void setup()
     // Maintains high level when idle, and is triggered by the falling edge after being touched. The frequency is 100HZ and is triggered once. Maintains 10ms in the low level interval
     // touch.setInterruptMode(FALLING);
 
+    Serial.println("Touch Info:");
+    Serial.print("Model: "); Serial.println(touch.getModelName());
+    Serial.print("ID: 0x"); Serial.println(touch.getChipID(), HEX);
+    Serial.print("Max Touch Points: "); Serial.println(touch.getSupportTouchPoint());
+    Serial.print("Resolution: "); Serial.print(touch.getResolutionX()); Serial.print("x"); Serial.println(touch.getResolutionY());
+    delay(3000);
 }
 
 
 void loop()
 {
     if (touch.isPressed()) {
-        uint8_t touched = touch.getPoint(x, y, touch.getSupportTouchPoint());
-        if (touched > 0) {
-            Serial.print(millis());
-            Serial.print("ms ");
-            for (int i = 0; i < touched; ++i) {
+        TouchPoints touch_points = touch.getTouchPoints();
+        if (touch_points.hasPoints()) {
+            for (int i = 0; i < touch_points.getPointCount(); ++i) {
+                const TouchPoint &point = touch_points.getPoint(i);
                 Serial.print("X[");
                 Serial.print(i);
                 Serial.print("]:");
-                Serial.print(x[i]);
+                Serial.print(point.x);
                 Serial.print(" ");
                 Serial.print(" Y[");
                 Serial.print(i);
                 Serial.print("]:");
-                Serial.print(y[i]);
+                Serial.print(point.y);
                 Serial.print(" ");
             }
             Serial.println();
@@ -120,6 +122,3 @@ void loop()
     }
     delay(100);
 }
-
-
-

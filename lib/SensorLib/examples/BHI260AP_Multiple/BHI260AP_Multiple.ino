@@ -115,24 +115,24 @@ SensorOrientation orientation2(bhy2);
 // After uploading firmware once, you can change this to false to speed up boot time.
 bool force_update_flash_firmware = false;
 
-bool isReadyFlag1 = false;
-bool isReadyFlag2 = false;
+bool isInterruptTriggered1 = false;
+bool isInterruptTriggered2 = false;
 
 void dataReady1_ISR()
 {
-    isReadyFlag1 = true;
+    isInterruptTriggered1 = true;
 }
 
 void dataReady2_ISR()
 {
-    isReadyFlag2 = true;
+    isInterruptTriggered2 = true;
 }
 
 void print_orientation(uint8_t direction)
 {
     char report[256];
     switch (direction) {
-    case SensorBHI260AP::DIRECTION_BOTTOM_LEFT:
+    case SensorDirection::DIRECTION_BOTTOM_LEFT:
         sprintf( report, "\r\n  ________________  " \
                  "\r\n |                | " \
                  "\r\n |                | " \
@@ -143,7 +143,7 @@ void print_orientation(uint8_t direction)
                  "\r\n |________________| \r\n" );
 
         break;
-    case SensorBHI260AP::DIRECTION_TOP_RIGHT:
+    case SensorDirection::DIRECTION_TOP_RIGHT:
         sprintf( report, "\r\n  ________________  " \
                  "\r\n |                | " \
                  "\r\n |             *  | " \
@@ -153,7 +153,7 @@ void print_orientation(uint8_t direction)
                  "\r\n |                | " \
                  "\r\n |________________| \r\n" );
         break;
-    case SensorBHI260AP::DIRECTION_TOP_LEFT:
+    case SensorDirection::DIRECTION_TOP_LEFT:
         sprintf( report, "\r\n  ________________  " \
                  "\r\n |                | " \
                  "\r\n |  *             | " \
@@ -163,7 +163,7 @@ void print_orientation(uint8_t direction)
                  "\r\n |                | " \
                  "\r\n |________________| \r\n" );
         break;
-    case SensorBHI260AP::DIRECTION_BOTTOM_RIGHT:
+    case SensorDirection::DIRECTION_BOTTOM_RIGHT:
         sprintf( report, "\r\n  ________________  " \
                  "\r\n |                | " \
                  "\r\n |                | " \
@@ -183,7 +183,7 @@ void print_orientation(uint8_t direction)
 }
 
 #ifndef USING_DATA_HELPER
-void orientation_process_callback(uint8_t  sensor_id, uint8_t *data_ptr, uint32_t len, uint64_t *timestamp, void *user_data)
+void orientation_process_callback(uint8_t  sensor_id, const uint8_t *data_ptr, uint32_t len, uint64_t *timestamp, void *user_data)
 {
     uint8_t direction = *data_ptr;
     if (user_data) {
@@ -194,7 +194,7 @@ void orientation_process_callback(uint8_t  sensor_id, uint8_t *data_ptr, uint32_
 #endif
 
 // Firmware update progress callback
-void progress_callback(void *user_data, uint32_t total, uint32_t transferred)
+void progress_callback(uint32_t total, uint32_t transferred, void *user_data)
 {
     float progress = (float)transferred / total * 100;
     Serial.print("Upload progress: ");
@@ -203,11 +203,11 @@ void progress_callback(void *user_data, uint32_t total, uint32_t transferred)
 }
 
 
-void initSensor(SensorBHI260AP & sensor, int rst, int sda, int scl, int irq,
+void initSensor(SensorBHI260AP &sensor, int rst, int sda, int scl, int irq,
                 TwoWire &wire, void(*interrupts)(),
                 void *user_data
 #ifdef USING_DATA_HELPER
-                , SensorOrientation&orientation
+                , SensorOrientation &orientation
 #endif
                )
 {
@@ -246,10 +246,18 @@ void initSensor(SensorBHI260AP & sensor, int rst, int sda, int scl, int irq,
 
     // Output all sensors info to Serial
     BoschSensorInfo info = sensor.getSensorInfo();
-#ifdef PLATFORM_HAS_PRINTF
-    info.printInfo(Serial);
+    
+#ifdef ARDUINO
+    ArduinoStreamPrinter printer(Serial);
+    info.printInfo(printer);
 #else
-    info.printInfo();
+    info.printInfo([](const char *format, ...) -> int {
+        va_list args;
+        va_start(args, format);
+        int result = vprintf(format, args);
+        va_end(args);
+        return result;
+    });
 #endif
 
     // The orientation sensor will only report when it changes, so the value is 0 ~ 1
@@ -260,9 +268,9 @@ void initSensor(SensorBHI260AP & sensor, int rst, int sda, int scl, int irq,
     orientation.enable(sample_rate, report_latency_ms);
 #else
     // Enable direction detection
-    sensor.configure(SensorBHI260AP::DEVICE_ORIENTATION, sample_rate, report_latency_ms);
+    sensor.configure(BoschSensorID::DEVICE_ORIENTATION, sample_rate, report_latency_ms);
     // Set the direction detection result output processing function
-    sensor.onResultEvent(SensorBHI260AP::DEVICE_ORIENTATION, orientation_process_callback, user_data);
+    sensor.onResultEvent(BoschSensorID::DEVICE_ORIENTATION, orientation_process_callback, user_data);
 #endif
     // Set the specified pin (BHI260_IRQ1) as an input pin.
     pinMode(irq, INPUT_PULLUP);
@@ -277,12 +285,12 @@ void setup()
     const char *sensor1_user_data = "Sensor1";
     const char *sensor2_user_data = "Sensor2";
 
-    initSensor(bhy1, BHI260_RST1, BHI260_SDA1, BHI260_SCL1, BHI260_IRQ1, Wire, dataReady1_ISR,  (void*)sensor1_user_data
+    initSensor(bhy1, BHI260_RST1, BHI260_SDA1, BHI260_SCL1, BHI260_IRQ1, Wire, dataReady1_ISR,  (void *)sensor1_user_data
 #ifdef USING_DATA_HELPER
                , orientation1
 #endif
               );
-    initSensor(bhy2, BHI260_RST2, BHI260_SDA2, BHI260_SCL2, BHI260_IRQ2, Wire1, dataReady2_ISR, (void*)sensor2_user_data
+    initSensor(bhy2, BHI260_RST2, BHI260_SDA2, BHI260_SCL2, BHI260_IRQ2, Wire1, dataReady2_ISR, (void *)sensor2_user_data
 #ifdef USING_DATA_HELPER
                , orientation2
 #endif
@@ -295,15 +303,15 @@ void setup()
 void loop()
 {
     // Update sensor fifo
-    if (isReadyFlag1) {
-        isReadyFlag1 = false;
-        Serial.println("isReadyFlag1:");
+    if (isInterruptTriggered1) {
+        isInterruptTriggered1 = false;
+        Serial.println("isInterruptTriggered1:");
         bhy1.update();
     }
 
-    if (isReadyFlag2) {
-        isReadyFlag2 = false;
-        Serial.println("isReadyFlag2:");
+    if (isInterruptTriggered2) {
+        isInterruptTriggered2 = false;
+        Serial.println("isInterruptTriggered2:");
         bhy2.update();
     }
 

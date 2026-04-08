@@ -132,16 +132,16 @@ uint8_t action1_pattern[] = {
 #endif
 
 #ifdef USING_SENSOR_IRQ_METHOD
-bool isReadyFlag = false;
+volatile bool isInterruptTriggered = false;
 
 void dataReadyISR()
 {
-    isReadyFlag = true;
+    isInterruptTriggered = true;
 }
 #endif /*USING_SENSOR_IRQ_METHOD*/
 
 // Firmware update progress callback
-void progress_callback(void *user_data, uint32_t total, uint32_t transferred)
+void progress_callback(uint32_t total, uint32_t transferred, void *user_data)
 {
     float progress = (float)transferred / total * 100;
     Serial.print("Upload progress: ");
@@ -202,10 +202,18 @@ void setup()
 
     // Output all sensors info to Serial
     BoschSensorInfo info = bhy.getSensorInfo();
-#ifdef PLATFORM_HAS_PRINTF
-    info.printInfo(Serial);
+    
+#ifdef ARDUINO
+    ArduinoStreamPrinter printer(Serial);
+    info.printInfo(printer);
 #else
-    info.printInfo();
+    info.printInfo([](const char *format, ...) -> int {
+        va_list args;
+        va_start(args, format);
+        int result = vprintf(format, args);
+        va_end(args);
+        return result;
+    });
 #endif
 
     // Attempt to initialize the KLIO sensor.
@@ -279,8 +287,8 @@ void setup()
 void loop()
 {
 #ifdef USING_SENSOR_IRQ_METHOD
-    if (isReadyFlag) {
-        isReadyFlag = false;
+    if (isInterruptTriggered) {
+        isInterruptTriggered = false;
 #endif /*USING_SENSOR_IRQ_METHOD*/
 
         /* If the interrupt is connected to the sensor and BHI260_IRQ is not equal to -1,

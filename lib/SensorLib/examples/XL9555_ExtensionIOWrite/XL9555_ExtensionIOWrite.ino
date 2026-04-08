@@ -28,7 +28,7 @@
  *
  */
 #include <Arduino.h>
-#include "ExtensionIOXL9555.hpp"
+#include "IoExpanderXL9555.hpp"
 
 #ifndef SENSOR_SDA
 #define SENSOR_SDA  17
@@ -38,24 +38,17 @@
 #define SENSOR_SCL  18
 #endif
 
-#ifndef SENSOR_IRQ
-#define SENSOR_IRQ  10
-#endif
-
-ExtensionIOXL9555 io;
+IoExpanderXL9555 expander;
 
 void setup()
 {
     Serial.begin(115200);
 
-    // Set the interrupt input to input pull-up
-    pinMode(SENSOR_IRQ, INPUT_PULLUP);
-
     /*
     *
     *    If the device address is not known, the 0xFF parameter can be passed in.
     *
-    *    XL9555_UNKOWN_ADDRESS  = 0xFF
+    *    XL9555_UNKNOWN_ADDRESS  = 0xFF
     *
     *    If the device address is known, the device address is given
     *
@@ -68,39 +61,37 @@ void setup()
     *    XL9555_SLAVE_ADDRESS6  = 0x26
     *    XL9555_SLAVE_ADDRESS7  = 0x27
     */
-    const uint8_t chip_address = XL9555_UNKOWN_ADDRESS;
+    const uint8_t chip_address = XL9555_UNKNOWN_ADDRESS;
 
-    if (!io.begin(Wire, chip_address, SENSOR_SDA, SENSOR_SCL)) {
+    if (!expander.begin(Wire, chip_address, SENSOR_SDA, SENSOR_SCL)) {
         while (1) {
             Serial.println("Failed to find XL9555 - check your wiring!");
             delay(1000);
         }
     }
 
-    // Set PORT0 as output ,mask = 0x00 = all pin output
-    io.configPort(ExtensionIOXL9555::PORT0, 0x00);
-    // Set PORT1 as output ,mask = 0x00 = all pin output
-    io.configPort(ExtensionIOXL9555::PORT1, 0x00);
+    // Set PORT0 as output 
+    expander.configPins(IoExpanderXL9555::PORT_ALL, OUTPUT);
 }
 
 void loop()
 {
-    // Set all PORTs to 1, and the parameters here are mask values, corresponding to the 0~7 bits
+    // Set all PORTs to 1, and the parameters here are mask values, corresponding to the 0~15 bits
     Serial.println("Set port HIGH");
-    io.writePort(ExtensionIOXL9555::PORT0, 0xFF);
+    expander.digitalWritePort(0xFFFF, HIGH);
     delay(1000);
 
     Serial.println("Set port LOW");
-    // Set all PORTs to 0, and the parameters here are mask values, corresponding to the 0~7 bits
-    io.writePort(ExtensionIOXL9555::PORT1, 0x00);
+    // Set all PORTs to 0, and the parameters here are mask values, corresponding to the 0~15 bits
+    expander.digitalWritePort(0x0000, LOW);
     delay(1000);
 
     Serial.println("digitalWrite");
-    io.digitalWrite(ExtensionIOXL9555::IO0, HIGH);
+    expander.digitalWrite(0, HIGH);
     delay(1000);
 
     Serial.println("digitalToggle");
-    io.digitalToggle(ExtensionIOXL9555::IO0);
+    expander.digitalToggle(0);
     delay(1000);
 
 

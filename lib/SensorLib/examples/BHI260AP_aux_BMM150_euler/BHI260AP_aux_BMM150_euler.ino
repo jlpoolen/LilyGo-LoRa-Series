@@ -133,16 +133,16 @@ bool force_update_flash_firmware = true;
 #endif
 
 #ifdef USING_SENSOR_IRQ_METHOD
-bool isReadyFlag = false;
+volatile bool isInterruptTriggered = false;
 
 void dataReadyISR()
 {
-    isReadyFlag = true;
+    isInterruptTriggered = true;
 }
 #endif /*USING_SENSOR_IRQ_METHOD*/
 
 #ifndef USING_DATA_HELPER
-void parse_euler(uint8_t sensor_id, uint8_t *data_ptr, uint32_t len, uint64_t *timestamp, void *user_data)
+void parse_euler(uint8_t sensor_id, const uint8_t *data_ptr, uint32_t len, uint64_t *timestamp, void *user_data)
 {
     struct bhy2_data_orientation data;
     uint32_t s, ns;
@@ -150,29 +150,27 @@ void parse_euler(uint8_t sensor_id, uint8_t *data_ptr, uint32_t len, uint64_t *t
     // Function to parse FIFO frame data into orientation
     bhy2_parse_orientation(data_ptr, &data);
     uint64_t _timestamp =  *timestamp;
-    time_to_s_ns(_timestamp, &s, &ns, &tns);
+    BoschSensorUtils::time_to_s_ns(_timestamp, &s, &ns, &tns);
     uint8_t accuracy =  bhy.getAccuracy();
     if (accuracy) {
-        Serial.print("SID:"); Serial.print(sensor_id);
         Serial.print(" T:"); Serial.print(s);
         Serial.print("."); Serial.print(ns);
-        Serial.print(" x:"); Serial.print(data.heading * 360.0f / 32768.0f);
-        Serial.print(" y:"); Serial.print(data.pitch * 360.0f / 32768.0f);
-        Serial.print(" x:"); Serial.print(data.roll * 360.0f / 32768.0f);
-        Serial.print(" acc:"); Serial.println(accuracy);
+        Serial.print(" R:"); Serial.print(data.roll * 360.0f / 32768.0f);
+        Serial.print(" P:"); Serial.print(data.pitch * 360.0f / 32768.0f);
+        Serial.print(" H:"); Serial.print(data.heading * 360.0f / 32768.0f);
+        Serial.print(" A:"); Serial.println(accuracy);
     } else {
-        Serial.print("SID:"); Serial.print(sensor_id);
         Serial.print(" T:"); Serial.print(s);
         Serial.print("."); Serial.print(ns);
-        Serial.print(" x:"); Serial.print(data.heading * 360.0f / 32768.0f);
-        Serial.print(" y:"); Serial.print(data.pitch * 360.0f / 32768.0f);
-        Serial.print(" x:"); Serial.println(data.roll * 360.0f / 32768.0f);
+        Serial.print(" R:"); Serial.print(data.roll * 360.0f / 32768.0f);
+        Serial.print(" P:"); Serial.print(data.pitch * 360.0f / 32768.0f);
+        Serial.print(" H:"); Serial.println(data.heading * 360.0f / 32768.0f);
     }
 }
 #endif
 
 // Firmware update progress callback
-void progress_callback(void *user_data, uint32_t total, uint32_t transferred)
+void progress_callback(uint32_t total, uint32_t transferred, void *user_data)
 {
     float progress = (float)transferred / total * 100;
     Serial.print("Upload progress: ");
@@ -233,10 +231,18 @@ void setup()
 
     // Output all sensors info to Serial
     BoschSensorInfo info = bhy.getSensorInfo();
-#ifdef PLATFORM_HAS_PRINTF
-    info.printInfo(Serial);
+    
+#ifdef ARDUINO
+    ArduinoStreamPrinter printer(Serial);
+    info.printInfo(printer);
 #else
-    info.printInfo();
+    info.printInfo([](const char *format, ...) -> int {
+        va_list args;
+        va_start(args, format);
+        int result = vprintf(format, args);
+        va_end(args);
+        return result;
+    });
 #endif
 
     float sample_rate = 100.0;      /* Read out data measured at 100Hz */
@@ -250,9 +256,9 @@ void setup()
 #ifdef USING_DATA_HELPER
     euler.enable(sample_rate, report_latency_ms);
 #else
-    bhy.configure(SensorBHI260AP::ORIENTATION_WAKE_UP, sample_rate, report_latency_ms);
+    bhy.configure(BoschSensorID::ORIENTATION_WAKE_UP, sample_rate, report_latency_ms);
     // Register event callback function
-    bhy.onResultEvent(SensorBHI260AP::ORIENTATION_WAKE_UP, parse_euler);
+    bhy.onResultEvent(BoschSensorID::ORIENTATION_WAKE_UP, parse_euler);
 #endif
 
 #ifdef USING_SENSOR_IRQ_METHOD
@@ -271,8 +277,8 @@ void setup()
 void loop()
 {
 #ifdef USING_SENSOR_IRQ_METHOD
-    if (isReadyFlag) {
-        isReadyFlag = false;
+    if (isInterruptTriggered) {
+        isInterruptTriggered = false;
 #endif /*USING_SENSOR_IRQ_METHOD*/
 
         /* If the interrupt is connected to the sensor and BHI260_IRQ is not equal to -1,

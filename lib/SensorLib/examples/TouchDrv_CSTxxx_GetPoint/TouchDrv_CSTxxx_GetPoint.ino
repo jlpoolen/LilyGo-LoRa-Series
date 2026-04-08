@@ -33,24 +33,23 @@
 #include "TouchDrvCSTXXX.hpp"
 
 #ifndef TOUCH_SDA
-#define TOUCH_SDA  8
+#define TOUCH_SDA  3
 #endif
 
 #ifndef TOUCH_SCL
-#define TOUCH_SCL  10
+#define TOUCH_SCL  2
 #endif
 
 #ifndef TOUCH_IRQ
-#define TOUCH_IRQ  5
+#define TOUCH_IRQ  21
 #endif
 
 #ifndef TOUCH_RST
-#define TOUCH_RST  -1
+#define TOUCH_RST  16
 #endif
 
 TouchDrvCSTXXX touch;
-int16_t x[5], y[5];
-bool  isPressed = false;
+volatile bool isPressed = false;
 
 void scanDevices(void)
 {
@@ -129,16 +128,20 @@ void setup()
 
     /*
     * Support type.
-    * TouchDrv_UNKOWN       : Judging by identification ID
-    * TouchDrv_CST8XX       : CST816X,CST328,CST716,CST820
-    * TouchDrv_CST226       : CST226X
+    * TouchDrv_UNKNOWN      : Judging by identification ID
+    * TouchDrv_CST8XX       : CST816X,CST716,CST820
+    * TouchDrv_CST226       : CST226X,CST328
     * TouchDrv_CST92XX      : CST9217,CST9220
     */
     // Can choose fixed touch model or automatic identification by ID
+    // touch.setTouchDrvModel(TouchDrv_CST8XX);
     // touch.setTouchDrvModel(TouchDrv_CST226);
+    // touch.setTouchDrvModel(TouchDrv_CST92XX);
 
+    // For touchscreens without an RST pin, the actual model may not be
+    // accurately detected, or some undefined behavior may occur.
 
-    // Support CST81X CST226 CST9217 CST9220 ....
+    // Support CST81X CST226 CST9217 CST9220 CST3530 ....
     bool result = touch.begin(Wire, address, TOUCH_SDA, TOUCH_SCL);
     if (result == false) {
         while (1) {
@@ -146,8 +149,6 @@ void setup()
             delay(1000);
         }
     }
-
-    Serial.print("Model :"); Serial.println(touch.getModelName());
 
     // T-Display-S3 CST328 touch panel, touch button coordinates are is 85 , 360
     // touch.setCenterButtonCoordinate(85, 360);
@@ -183,24 +184,31 @@ void setup()
         isPressed = true;
     }, FALLING);
 
+    Serial.println("Touch Info:");
+    Serial.print("Model: "); Serial.println(touch.getModelName());
+    Serial.print("ID: 0x"); Serial.println(touch.getChipID(), HEX);
+    Serial.print("Max Touch Points: "); Serial.println(touch.getSupportTouchPoint());
+    Serial.print("Resolution: "); Serial.print(touch.getResolutionX()); Serial.print("x"); Serial.println(touch.getResolutionY());
+    delay(3000);
 }
 
 void loop()
 {
     if (isPressed) {
         isPressed = false;
-        uint8_t touched = touch.getPoint(x, y, touch.getSupportTouchPoint());
-        if (touched) {
-            for (int i = 0; i < touched; ++i) {
+        TouchPoints touch_points = touch.getTouchPoints();
+        if (touch_points.hasPoints()) {
+            for (int i = 0; i < touch_points.getPointCount(); ++i) {
+                const TouchPoint &point = touch_points.getPoint(i);
                 Serial.print("X[");
                 Serial.print(i);
                 Serial.print("]:");
-                Serial.print(x[i]);
+                Serial.print(point.x);
                 Serial.print(" ");
                 Serial.print(" Y[");
                 Serial.print(i);
                 Serial.print("]:");
-                Serial.print(y[i]);
+                Serial.print(point.y);
                 Serial.print(" ");
             }
             Serial.println();
@@ -209,6 +217,3 @@ void loop()
 
     delay(5);
 }
-
-
-

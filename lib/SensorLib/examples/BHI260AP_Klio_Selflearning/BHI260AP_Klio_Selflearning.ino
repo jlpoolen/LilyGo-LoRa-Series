@@ -105,16 +105,16 @@ bool force_update_flash_firmware = true;
 #endif
 
 #ifdef USING_SENSOR_IRQ_METHOD
-bool isReadyFlag = false;
+volatile bool isInterruptTriggered = false;
 
 void dataReadyISR()
 {
-    isReadyFlag = true;
+    isInterruptTriggered = true;
 }
 #endif /*USING_SENSOR_IRQ_METHOD*/
 
 // Firmware update progress callback
-void progress_callback(void *user_data, uint32_t total, uint32_t transferred)
+void progress_callback(uint32_t total, uint32_t transferred, void *user_data)
 {
     float progress = (float)transferred / total * 100;
     Serial.print("Upload progress: ");
@@ -158,7 +158,7 @@ void recognition_event_callback(uint8_t pattern_id, float count, void *user_data
  * and takes actions based on the learning results.
  *
  * @param reason The reason for the learning change. It is an enumeration value from the
- *               SensorBHI260AP_Klio::LeaningChangeReason type, indicating why the learning state has changed.
+ *               SensorBHI260AP_Klio::LearningChangeReason type, indicating why the learning state has changed.
  * @param progress The current progress of the learning process, represented as an unsigned 32 - bit integer.
  *                 This value typically ranges from 0 to 100, indicating the percentage of the learning completion.
  * @param learn_index The index of the learned pattern. If the learning is invalid, it will be set to
@@ -166,7 +166,7 @@ void recognition_event_callback(uint8_t pattern_id, float count, void *user_data
  * @param user_data A pointer to user - defined data. It can be used to pass additional context information
  *                  from the calling code to this callback function. In this implementation, it may not be used actively.
  */
-void learning_event_callback(SensorBHI260AP_Klio::LeaningChangeReason reason, uint32_t progress, int learn_index, void *user_data)
+void learning_event_callback(SensorBHI260AP_Klio::LearningChangeReason reason, uint32_t progress, int learn_index, void *user_data)
 {
     // Print the learning event details to the serial monitor, including the progress, reason, and learned pattern index.
     Serial.print("->Learning [Progress:");
@@ -280,10 +280,18 @@ void setup()
 
     // Output all sensors info to Serial
     BoschSensorInfo info = bhy.getSensorInfo();
-#ifdef PLATFORM_HAS_PRINTF
-    info.printInfo(Serial);
+    
+#ifdef ARDUINO
+    ArduinoStreamPrinter printer(Serial);
+    info.printInfo(printer);
 #else
-    info.printInfo();
+    info.printInfo([](const char *format, ...) -> int {
+        va_list args;
+        va_start(args, format);
+        int result = vprintf(format, args);
+        va_end(args);
+        return result;
+    });
 #endif
 
     // Try to initialize the KLIO sensor.
@@ -351,8 +359,8 @@ void setup()
 void loop()
 {
 #ifdef USING_SENSOR_IRQ_METHOD
-    if (isReadyFlag) {
-        isReadyFlag = false;
+    if (isInterruptTriggered) {
+        isInterruptTriggered = false;
 #endif /*USING_SENSOR_IRQ_METHOD*/
 
         /* If the interrupt is connected to the sensor and BHI260_IRQ is not equal to -1,

@@ -89,25 +89,11 @@ void initialiseCommander();
 SensorBHI260AP bhy;
 
 // The firmware runs in RAM and will be lost if the power is off. The firmware will be loaded from RAM each time it is run.
-// #define BOSCH_APP30_SHUTTLE_BHI260_FW
-// #define BOSCH_APP30_SHUTTLE_BHI260_AUX_BMM150FW
-// #define BOSCH_APP30_SHUTTLE_BHI260_BME68X
-// #define BOSCH_APP30_SHUTTLE_BHI260_BMP390
-// #define BOSCH_APP30_SHUTTLE_BHI260_TURBO
-// #define BOSCH_BHI260_AUX_BEM280
-// #define BOSCH_BHI260_AUX_BMM150_BEM280
 #define BOSCH_BHI260_AUX_BMM150_BEM280_GPIO
 // #define BOSCH_BHI260_AUX_BMM150_GPIO
 // #define BOSCH_BHI260_GPIO
 
 // Firmware is stored in flash and booted from flash,Depends on BHI260 hardware connected to SPI Flash
-// #define BOSCH_APP30_SHUTTLE_BHI260_AUX_BMM150_FLASH
-// #define BOSCH_APP30_SHUTTLE_BHI260_BME68X_FLASH
-// #define BOSCH_APP30_SHUTTLE_BHI260_BMP390_FLASH
-// #define BOSCH_APP30_SHUTTLE_BHI260_FLASH
-// #define BOSCH_APP30_SHUTTLE_BHI260_TURBO_FLASH
-// #define BOSCH_BHI260_AUX_BEM280_FLASH
-// #define BOSCH_BHI260_AUX_BMM150_BEM280_FLASH
 // #define BOSCH_BHI260_AUX_BMM150_BEM280_GPIO_FLASH
 // #define BOSCH_BHI260_AUX_BMM150_GPIO_FLASH
 // #define BOSCH_BHI260_GPIO_FLASH
@@ -124,29 +110,29 @@ bool force_update_flash_firmware = true;
 #endif
 
 #ifdef USING_SENSOR_IRQ_METHOD
-bool isReadyFlag = false;
+volatile bool isInterruptTriggered = false;
 
 void dataReadyISR()
 {
-    isReadyFlag = true;
+    isInterruptTriggered = true;
 }
 #endif /*USING_SENSOR_IRQ_METHOD*/
 
-void parse_bme280_sensor_data(uint8_t sensor_id, uint8_t *data_ptr, uint32_t len, uint64_t *timestamp, void *user_data)
+void parse_bme280_sensor_data(uint8_t sensor_id, const uint8_t *data_ptr, uint32_t len, uint64_t *timestamp, void *user_data)
 {
     float humidity = 0;
     float temperature = 0;
     float pressure = 0;
     switch (sensor_id) {
-    case SensorBHI260AP::HUMIDITY:
+    case BoschSensorID::HUMIDITY:
         bhy2_parse_humidity(data_ptr, &humidity);
         Serial.print("humidity:"); Serial.print(humidity); Serial.println("%");
         break;
-    case SensorBHI260AP::TEMPERATURE:
+    case BoschSensorID::TEMPERATURE:
         bhy2_parse_temperature_celsius(data_ptr, &temperature);
         Serial.print("temperature:"); Serial.print(temperature); Serial.println("*C");
         break;
-    case SensorBHI260AP::BAROMETER:
+    case BoschSensorID::BAROMETER:
         bhy2_parse_pressure(data_ptr, &pressure);
         Serial.print("pressure:"); Serial.print(pressure); Serial.println("hPa");
         break;
@@ -156,30 +142,8 @@ void parse_bme280_sensor_data(uint8_t sensor_id, uint8_t *data_ptr, uint32_t len
     }
 }
 
-void sensor_event_callback(uint8_t event, uint8_t sensor_id, uint8_t data)
-{
-    Serial.print("Sensor Event:");
-    const char  *sensorName = bhy.getSensorName(sensor_id);
-    switch (event) {
-    case BHY2_META_EVENT_SAMPLE_RATE_CHANGED:
-        Serial.print("Sample rate changed for ");
-        Serial.print(sensorName);
-        Serial.println(" sensor");
-        break;
-    case BHY2_META_EVENT_POWER_MODE_CHANGED:
-        Serial.print("Power mode changed for ");
-        Serial.print(sensorName);
-        Serial.println(" sensor");
-        break;
-    default:
-        Serial.print("Other event : ");
-        Serial.println(event);
-        break;
-    }
-}
-
 // Firmware update progress callback
-void progress_callback(void *user_data, uint32_t total, uint32_t transferred)
+void progress_callback(uint32_t total, uint32_t transferred, void *user_data)
 {
     float progress = (float)transferred / total * 100;
     Serial.print("Upload progress: ");
@@ -240,20 +204,25 @@ void setup()
 
     Serial.println("Initializing the sensor successfully!");
 
-    // Register sensor change event callback
-    bhy.onEvent(sensor_event_callback);
-
     // Register BME280 data parse callback function
-    bhy.onResultEvent(SensorBHI260AP::TEMPERATURE, parse_bme280_sensor_data);
-    bhy.onResultEvent(SensorBHI260AP::HUMIDITY, parse_bme280_sensor_data);
-    bhy.onResultEvent(SensorBHI260AP::BAROMETER, parse_bme280_sensor_data);
+    bhy.onResultEvent(BoschSensorID::TEMPERATURE, parse_bme280_sensor_data);
+    bhy.onResultEvent(BoschSensorID::HUMIDITY, parse_bme280_sensor_data);
+    bhy.onResultEvent(BoschSensorID::BAROMETER, parse_bme280_sensor_data);
 
     // Output all sensors info to Serial
     BoschSensorInfo info = bhy.getSensorInfo();
-#ifdef PLATFORM_HAS_PRINTF
-    info.printInfo(Serial);
+    
+#ifdef ARDUINO
+    ArduinoStreamPrinter printer(Serial);
+    info.printInfo(printer);
 #else
-    info.printInfo();
+    info.printInfo([](const char *format, ...) -> int {
+        va_list args;
+        va_start(args, format);
+        int result = vprintf(format, args);
+        va_end(args);
+        return result;
+    });
 #endif
 
     initialiseCommander();
@@ -278,10 +247,10 @@ void loop()
 {
     //Call the update functions using the activeCommander pointer
     cmd.update();
-    
+
 #ifdef USING_SENSOR_IRQ_METHOD
-    if (isReadyFlag) {
-        isReadyFlag = false;
+    if (isInterruptTriggered) {
+        isInterruptTriggered = false;
 #endif /*USING_SENSOR_IRQ_METHOD*/
 
         /* If the interrupt is connected to the sensor and BHI260_IRQ is not equal to -1,
@@ -337,7 +306,7 @@ bool setTemperature(Commander &Cmdr)
         return 0;
     }
     Cmdr.getFloat(sample_rate);
-    bhy.configure(SensorBHI260AP::TEMPERATURE, sample_rate, 0);
+    bhy.configure(BoschSensorID::TEMPERATURE, sample_rate, 0);
     return 0;
 }
 
@@ -349,7 +318,7 @@ bool setHumidity(Commander &Cmdr)
         return 0;
     }
     Cmdr.getFloat(sample_rate);
-    bhy.configure(SensorBHI260AP::HUMIDITY, sample_rate, 0);
+    bhy.configure(BoschSensorID::HUMIDITY, sample_rate, 0);
     return 0;
 }
 
@@ -361,7 +330,7 @@ bool setPressure(Commander &Cmdr)
         return 0;
     }
     Cmdr.getFloat(sample_rate);
-    bhy.configure(SensorBHI260AP::BAROMETER, sample_rate, 0);
+    bhy.configure(BoschSensorID::BAROMETER, sample_rate, 0);
     return 0;
 }
 

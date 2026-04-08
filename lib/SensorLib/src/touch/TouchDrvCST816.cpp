@@ -28,59 +28,6 @@
  */
 #include "TouchDrvCST816.h"
 
-TouchDrvCST816::TouchDrvCST816() : comm(nullptr), hal(nullptr),
-    _center_btn_x(0),
-    _center_btn_y(0)
-{
-}
-
-TouchDrvCST816::~TouchDrvCST816()
-{
-    if (comm) {
-        comm->deinit();
-    }
-}
-
-#if defined(ARDUINO)
-bool TouchDrvCST816::begin(TwoWire &wire, uint8_t addr, int sda, int scl)
-{
-    if (!beginCommon<SensorCommI2C, HalArduino>(comm, hal, wire, addr, sda, scl)) {
-        return false;
-    }
-    return initImpl();
-}
-#elif defined(ESP_PLATFORM)
-
-#if defined(USEING_I2C_LEGACY)
-bool TouchDrvCST816::begin(i2c_port_t port_num, uint8_t addr, int sda, int scl)
-{
-    if (!beginCommon<SensorCommI2C, HalEspIDF>(comm, hal, port_num, addr, sda, scl)) {
-        return false;
-    }
-    return true;
-}
-#else
-bool TouchDrvCST816::begin(i2c_master_bus_handle_t handle, uint8_t addr)
-{
-    if (!beginCommon<SensorCommI2C, HalEspIDF>(comm, hal, handle, addr)) {
-        return false;
-    }
-    return true;
-}
-#endif  //USEING_I2C_LEGACY
-#endif //ARDUINO
-
-bool TouchDrvCST816::begin(SensorCommCustom::CustomCallback callback,
-                           SensorCommCustomHal::CustomHalCallback hal_callback,
-                           uint8_t addr)
-{
-    if (!beginCommCustomCallback<SensorCommCustom, SensorCommCustomHal>(COMM_CUSTOM,
-            callback, hal_callback, addr, comm, hal)) {
-        return false;
-    }
-    return initImpl();
-}
-
 void TouchDrvCST816::reset()
 {
     if (_rst != -1) {
@@ -92,46 +39,44 @@ void TouchDrvCST816::reset()
     }
 }
 
-uint8_t TouchDrvCST816::getPoint(int16_t *x_array, int16_t *y_array, uint8_t get_point)
+const TouchPoints &TouchDrvCST816::getTouchPoints()
 {
+    static TouchPoints points;
     uint8_t buffer[13];
-    if (comm->readRegister(CST8xx_REG_STATUS, buffer, 13) == -1) {
-        return 0;
+    uint16_t x = 0, y = 0;
+
+    // Clear cached touch points
+    points.clear();
+
+    if (comm->readRegister(CST8xx_REG_STATUS, buffer, 13) == 0) {
+
+        // Some CST816T will return all 0xFF after turning off automatic sleep.
+        if (buffer[2] == 0x00 || buffer[2] == 0xFF) {
+            return points;
+        }
+
+        uint8_t numPoints = buffer[2] & 0x0F; // Get number of touch points (lower 4 bits)
+
+        // CST816 only supports single touch
+        if (numPoints > MAX_FINGER_NUM) {
+            return points;
+        }
+
+        x = ((buffer[3] & 0x0F) << 8 | buffer[4]);
+        y = ((buffer[5] & 0x0F) << 8 | buffer[6]);
+
+        // Depends on touch screen firmware
+        if (x == _center_btn_x && y == _center_btn_y && _HButtonCallback) {
+            _HButtonCallback(_userData);
+            return points; // Return zero points
+        }
+        // If not center button, add point
+        points.addPoint(x, y);
+        // Swap XY or mirroring coordinates,if set
+        updateXY(points);
     }
 
-    if (!buffer[2] || !x_array || !y_array || !get_point) {
-        return 0;
-    }
-
-    // Some CST816T will return all 0xFF after turning off automatic sleep.
-    if (buffer[2] == 0xFF) {
-        return 0;
-    }
-
-    uint8_t numPoints = buffer[2] & 0x0F;
-
-    // CST816 only supports single touch
-    if (numPoints > 1) {
-        return 0;
-    }
-
-    int16_t tmp_x, tmp_y;
-
-    tmp_x = ((buffer[CST8xx_REG_XPOS_HIGH] & 0x0F) << 8 | buffer[CST8xx_REG_XPOS_LOW]);
-    tmp_y = ((buffer[CST8xx_REG_YPOS_HIGH] & 0x0F) << 8 | buffer[CST8xx_REG_YPOS_LOW]);
-
-    // Depends on touch screen firmware
-    if (tmp_x == _center_btn_x && tmp_y == _center_btn_y && _HButtonCallback) {
-        _HButtonCallback(_userData);
-        return 0;
-    }
-
-    x_array[0] = tmp_x;
-    y_array[0] = tmp_y;
-
-    updateXY(numPoints, x_array, y_array);
-
-    return numPoints;
+    return points;
 }
 
 bool TouchDrvCST816::isPressed()
@@ -147,9 +92,8 @@ bool TouchDrvCST816::isPressed()
         }
         return false;
     }
-    return getPoint(NULL, NULL, 1);
+    return getTouchPoints().hasPoints();
 }
-
 
 const char *TouchDrvCST816::getModelName()
 {
@@ -167,7 +111,7 @@ const char *TouchDrvCST816::getModelName()
     default:
         break;
     }
-    return "UNKNOW";
+    return "UNKNOWN";
 }
 
 void TouchDrvCST816::sleep()
@@ -187,34 +131,6 @@ void TouchDrvCST816::wakeup()
 {
     reset();
 }
-
-void TouchDrvCST816::idle()
-{
-
-}
-
-uint8_t TouchDrvCST816::getSupportTouchPoint()
-{
-    return 1;
-}
-
-bool TouchDrvCST816::getResolution(int16_t *x, int16_t *y)
-{
-    return false;
-}
-
-void TouchDrvCST816::setHomeButtonCallback(HomeButtonCallback cb, void *user_data)
-{
-    _HButtonCallback = cb;
-    _userData = user_data;
-}
-
-void TouchDrvCST816::setCenterButtonCoordinate(int16_t x, int16_t y)
-{
-    _center_btn_x = x;
-    _center_btn_y = y;
-}
-
 
 void TouchDrvCST816::disableAutoSleep()
 {
@@ -250,16 +166,7 @@ void TouchDrvCST816::enableAutoSleep()
     }
 }
 
-void TouchDrvCST816::setGpioCallback(CustomMode mode_cb,
-                                     CustomWrite write_cb,
-                                     CustomRead read_cb)
-{
-    SensorHalCustom::setCustomMode(mode_cb);
-    SensorHalCustom::setCustomWrite(write_cb);
-    SensorHalCustom::setCustomRead(read_cb);
-}
-
-bool TouchDrvCST816::initImpl()
+bool TouchDrvCST816::initImpl(uint8_t addr)
 {
 
     if (_rst != -1) {
@@ -297,9 +204,7 @@ bool TouchDrvCST816::initImpl()
 
     log_i("Touch type:%s", getModelName());
 
+    _maxTouchPoints = 1;
+
     return true;
 }
-
-
-
-

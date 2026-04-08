@@ -48,8 +48,6 @@
 
 TouchDrvGT9895 touch;
 
-int16_t x[GT9895_MAX_TOUCH], y[GT9895_MAX_TOUCH];
-
 void setup()
 {
     Serial.begin(115200);
@@ -104,26 +102,21 @@ void loop()
     *    This requires the touch screen manufacturer to provide a firmware update, which is currently unavailable.
     * 2. Use polling registers instead of interrupts, but this will consume CPU
     */
-    if (touch.isPressed()) {        //IRQ Trigger
-
-        uint8_t touched = touch.getPoint(x, y, touch.getSupportTouchPoint());
-        if (touched > 0) {
-            for (int i = 0; i < touched; ++i) {
-                Serial.print("X[");
-                Serial.print(i);
-                Serial.print("]:");
-                Serial.print(x[i]);
-                Serial.print(" ");
-                Serial.print(" Y[");
-                Serial.print(i);
-                Serial.print("]:");
-                Serial.print(y[i]);
-                Serial.print(" ");
-            }
-            Serial.println();
+    TouchPoints touch_points = touch.getTouchPoints();
+    if (touch_points.hasPoints()) {
+        for (int i = 0; i < touch_points.getPointCount(); ++i) {
+            const TouchPoint &point = touch_points.getPoint(i);
+            Serial.print("X[");
+            Serial.print(i);
+            Serial.print("]:");
+            Serial.print(point.x);
+            Serial.print(" ");
+            Serial.print(" Y[");
+            Serial.print(i);
+            Serial.print("]:");
+            Serial.print(point.y);
+            Serial.print(" ");
         }
-
+        Serial.println();
     }
-
 }
-

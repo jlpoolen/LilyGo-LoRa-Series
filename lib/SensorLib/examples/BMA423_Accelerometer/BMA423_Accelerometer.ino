@@ -2,7 +2,7 @@
  *
  * @license MIT License
  *
- * Copyright (c) 2022 lewis he
+ * Copyright (c) 2026 lewis he
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to deal
@@ -24,13 +24,9 @@
  *
  * @file      BMA423_Accelerometer.ino
  * @author    Lewis He (lewishe@outlook.com)
- * @date      2023-04-01
- *
+ * @date      2026-01-31
  */
-#include <Wire.h>
-#include <SPI.h>
-#include <Arduino.h>
-#include "SensorBMA423.hpp"
+#include <SensorBMA423.hpp>
 
 #ifndef SENSOR_SDA
 #define SENSOR_SDA  21
@@ -44,49 +40,97 @@
 #define SENSOR_IRQ  39
 #endif
 
-SensorBMA423 accel;
-uint32_t intervalue;
+SensorBMA423 accelSensor;
+
+volatile bool isInterruptTriggered = false;
 
 void setup()
 {
+    bool rslt;
+
     Serial.begin(115200);
     while (!Serial);
 
     pinMode(SENSOR_IRQ, INPUT);
+    attachInterrupt(SENSOR_IRQ, []() {
+        isInterruptTriggered = true;
+    }, RISING);
 
-    /*
-    * BMA423_I2C_ADDR_PRIMARY   = 0x18
-    * BMA423_I2C_ADDR_SECONDARY = 0x19
-    * * */
-    if (!accel.begin(Wire, BMA423_I2C_ADDR_SECONDARY, SENSOR_SDA, SENSOR_SCL)) {
-        Serial.println("Failed to find BMA423 - check your wiring!");
+    // Sensor initialization
+    rslt = accelSensor.begin(Wire, BMA4XX_I2C_ADDR_SDO_HIGH, SENSOR_SDA, SENSOR_SCL);
+    if (!rslt) {
         while (1) {
+            Serial.println("BMA4xx sensor initialization failed");
             delay(1000);
         }
     }
-    Serial.println("Init BAM423 Sensor success!");
 
-    //Default 4G ,200HZ
-    accel.configAccelerometer();
+    Serial.print(accelSensor.getModelName());
+    Serial.println(" Sensor initialized successfully");
 
-    accel.enableAccelerometer();
+    // Set sensor orientation, based on the hardware placement setting
+    rslt = accelSensor.setRemapAxes(SensorRemap::TOP_LAYER_RIGHT_CORNER);
+    if (!rslt) {
+        Serial.println("Failed to set remap axes");
+    }
+
+    // Accelerometer configuration
+    // The desired operation mode. Allowed values are SUSPEND, NORMAL.
+    OperationMode operationMode = OperationMode::NORMAL;
+    // The desired full-scale range. Allowed values are FS_2G, FS_4G, FS_8G, FS_16G.
+    AccelFullScaleRange fullScaleRange = AccelFullScaleRange::FS_2G;
+    // The desired bandwidth. Allowed values are OSR4_AVG1, OSR2_AVG2, NORMAL_AVG4, etc.
+    AccelBandwidth bandwidth = AccelBandwidth::OSR2_AVG2;
+    // The desired data rate in Hz. Allowed values are 0.78, 1.56, 3.12, 6.25, 12.5, 25, 50, 100, 200, 400, 800, 1600.
+    float data_rate_hz = 100.0f;
+    // The desired performance mode. Allowed values are CIC_AVG_MODE, CONTINUOUS_MODE
+    AccelPerfMode perfMode = AccelPerfMode::CIC_AVG_MODE;
+
+    if (!accelSensor.configAccelerometer(operationMode, fullScaleRange, data_rate_hz, bandwidth, perfMode)) {
+        Serial.println("Failed to configure accelerometer");
+        while (1);
+    }
+
+    // Enable data ready feature
+    rslt = accelSensor.enableDataReady(true);
+    if (!rslt) {
+        Serial.println("Failed to enable data ready");
+        while (1);
+    }
+
+    delay(3000);
+
+    Serial.println("Now read accelerometer data form sensor");
 }
-
 
 void loop()
 {
-    int16_t x = 0, y = 0, z = 0;
-    accel.getAccelerometer(x, y, z);
-    Serial.print("X:");
-    Serial.print(x); Serial.print(" ");
-    Serial.print("Y:");
-    Serial.print(y); Serial.print(" ");
-    Serial.print("Z:");
-    Serial.print(z);
-    Serial.println();
-
-    delay(50);
+    AccelerometerData  accelData;
+    if (accelSensor.isDataReady()) {
+        // Read the accelerometer data
+        if (accelSensor.readData(accelData)) {
+            Serial.print("Temperature: ");
+            Serial.print(accelData.temperature);
+            Serial.print(" °C, Acc_Raw: (");
+            Serial.print(accelData.raw.x);
+            Serial.print(", ");
+            Serial.print(accelData.raw.y);
+            Serial.print(", ");
+            Serial.print(accelData.raw.z);
+            Serial.print("), Acc_ms2: (");
+            Serial.print(accelData.mps2.x, 2);
+            Serial.print(", ");
+            Serial.print(accelData.mps2.y, 2);
+            Serial.print(", ");
+            Serial.print(accelData.mps2.z, 2);
+            Serial.print(") ");
+            uint32_t timeSampleMs = accelSensor.getTimeSampleMs();
+            Serial.print(timeSampleMs);
+            Serial.print("(ms)/");
+            Serial.print(millis());
+            Serial.println(" ");
+        } else {
+            Serial.println("Failed to read accelerometer data");
+        }
+    }
 }
-
-
-

@@ -134,16 +134,16 @@ bool force_update_flash_firmware = true;
 #endif
 
 #ifdef USING_SENSOR_IRQ_METHOD
-bool isReadyFlag = false;
+volatile bool isInterruptTriggered = false;
 
 void dataReadyISR()
 {
-    isReadyFlag = true;
+    isInterruptTriggered = true;
 }
 #endif /*USING_SENSOR_IRQ_METHOD*/
 
 // Firmware update progress callback
-void progress_callback(void *user_data, uint32_t total, uint32_t transferred)
+void progress_callback(uint32_t total, uint32_t transferred, void *user_data)
 {
     float progress = (float)transferred / total * 100;
     Serial.print("Upload progress: ");
@@ -155,7 +155,7 @@ void print_orientation(uint8_t direction)
 {
     char report[256];
     switch (direction) {
-    case SensorBHI260AP::DIRECTION_BOTTOM_LEFT:
+    case SensorDirection::DIRECTION_BOTTOM_LEFT:
         sprintf( report, "\r\n  ________________  " \
                  "\r\n |                | " \
                  "\r\n |                | " \
@@ -166,7 +166,7 @@ void print_orientation(uint8_t direction)
                  "\r\n |________________| \r\n" );
 
         break;
-    case SensorBHI260AP::DIRECTION_TOP_RIGHT:
+    case SensorDirection::DIRECTION_TOP_RIGHT:
         sprintf( report, "\r\n  ________________  " \
                  "\r\n |                | " \
                  "\r\n |             *  | " \
@@ -176,7 +176,7 @@ void print_orientation(uint8_t direction)
                  "\r\n |                | " \
                  "\r\n |________________| \r\n" );
         break;
-    case SensorBHI260AP::DIRECTION_TOP_LEFT:
+    case SensorDirection::DIRECTION_TOP_LEFT:
         sprintf( report, "\r\n  ________________  " \
                  "\r\n |                | " \
                  "\r\n |  *             | " \
@@ -186,7 +186,7 @@ void print_orientation(uint8_t direction)
                  "\r\n |                | " \
                  "\r\n |________________| \r\n" );
         break;
-    case SensorBHI260AP::DIRECTION_BOTTOM_RIGHT:
+    case SensorDirection::DIRECTION_BOTTOM_RIGHT:
         sprintf( report, "\r\n  ________________  " \
                  "\r\n |                | " \
                  "\r\n |                | " \
@@ -206,7 +206,7 @@ void print_orientation(uint8_t direction)
 }
 
 #ifndef USING_DATA_HELPER
-void orientation_process_callback(uint8_t  sensor_id, uint8_t *data_ptr, uint32_t len, uint64_t *timestamp, void *user_data)
+void orientation_process_callback(uint8_t  sensor_id, const uint8_t *data_ptr, uint32_t len, uint64_t *timestamp, void *user_data)
 {
     uint8_t direction = *data_ptr;
     Serial.print(bhy.getSensorName(sensor_id));
@@ -268,10 +268,18 @@ void setup()
 
     // Output all sensors info to Serial
     BoschSensorInfo info = bhy.getSensorInfo();
-#ifdef PLATFORM_HAS_PRINTF
-    info.printInfo(Serial);
+    
+#ifdef ARDUINO
+    ArduinoStreamPrinter printer(Serial);
+    info.printInfo(printer);
 #else
-    info.printInfo();
+    info.printInfo([](const char *format, ...) -> int {
+        va_list args;
+        va_start(args, format);
+        int result = vprintf(format, args);
+        va_end(args);
+        return result;
+    });
 #endif
 
     // The orientation sensor will only report when it changes, so the value is 0 ~ 1
@@ -282,9 +290,9 @@ void setup()
     orientation.enable(sample_rate, report_latency_ms);
 #else
 // Enable direction detection
-    bhy.configure(SensorBHI260AP::DEVICE_ORIENTATION, sample_rate, report_latency_ms);
+    bhy.configure(BoschSensorID::DEVICE_ORIENTATION, sample_rate, report_latency_ms);
 // Set the direction detection result output processing function
-    bhy.onResultEvent(SensorBHI260AP::DEVICE_ORIENTATION, orientation_process_callback);
+    bhy.onResultEvent(BoschSensorID::DEVICE_ORIENTATION, orientation_process_callback);
 #endif
 
 #ifdef USING_SENSOR_IRQ_METHOD
@@ -303,8 +311,8 @@ void setup()
 void loop()
 {
 #ifdef USING_SENSOR_IRQ_METHOD
-    if (isReadyFlag) {
-        isReadyFlag = false;
+    if (isInterruptTriggered) {
+        isInterruptTriggered = false;
 #endif /*USING_SENSOR_IRQ_METHOD*/
 
         /* If the interrupt is connected to the sensor and BHI260_IRQ is not equal to -1,
