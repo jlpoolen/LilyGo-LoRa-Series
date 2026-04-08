@@ -132,6 +132,7 @@
 | --------------------------------------- | ------------- | -------------- |
 | OLED Display (**SH1106**)               | 0x3C/0x3D     | ✅️  (I2C Bus 0) |
 | MAG Sensor(**QMC6310U OR QMC6310N**)    | 0x1C/0x3C     | ✅️  (I2C Bus 0) |
+| MAG Sensor(**QMC6309**)                 | 0x7C          | ✅️  (I2C Bus 0) |
 | Temperature/humidity Sensor(**BME280**) | 0x77          | ✅️  (I2C Bus 0) |
 | RTC (**PCF8563**)                       | 0x51          | ❌ (I2C Bus 1)  |
 | Power Manager (**AXP2101**)             | 0x34          | ❌ (I2C Bus 1)  |
@@ -144,6 +145,7 @@
 >
 > The QMC6310U and QMC6310N use different device addresses: QMC6310U (0x1C) and QMC6310N (0x3C).
 > The SH1106 uses either device address 0x3C or 0x3D. If using the QMC6310U version, the device address is 0x3C; if using the QMC6310N version, the device address is 0x3D.
+> The screen device address using the QMC6309 magnetic sensor is 0x3C, the same as the QMC6310U.
 >
 
 ### BME280 Address
