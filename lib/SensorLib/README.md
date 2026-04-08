@@ -14,6 +14,8 @@
   <a href="https://github.com/lewisxhe/SensorLib/actions/workflows/platformio.yml"><img src="https://github.com/lewisxhe/SensorLib/actions/workflows/platformio.yml/badge.svg" /></a>
   <a href="https://www.ardu-badge.com/SensorLib"><img src="https://www.ardu-badge.com/badge/SensorLib.svg?" /></a>
   <a href="https://registry.platformio.org/libraries/lewisxhe/SensorLib"><img src="https://badges.registry.platformio.org/packages/lewisxhe/library/SensorLib.svg" /></a>
+  <a href="https://components.espressif.com/components/lewisxhe/sensorlib">
+  <img src="https://img.shields.io/badge/ESP--IDF%20Registry-v0.4.0-success?logo=espressif&logoColor=white&color=009688&style=flat-square" alt="ESP-IDF Component Registry"></a>
 </p>
 
 <p align="center">
@@ -38,6 +40,7 @@
 - [Installation](#installation)
   - [Arduino IDE](#arduino-ide)
   - [PlatformIO](#platformio)
+  - [ESP-IDF](#esp-idf)
 - [Examples](#examples)
 - [Support list](#support-list)
 - [Notes](#notes)
@@ -100,6 +103,20 @@ lib_deps =
    - `<your_project>/lib/SensorLib/`
 2. PlatformIO will auto-detect it as a local library
 
+### ESP-IDF
+
+SensorLib is now published in the official **ESP-IDF Component Registry**, and supports ESP-IDF v4.4+ (recommended v5.1+).
+
+**1. Add Dependency (in project root `idf_component.yml`)**
+
+Create or edit `idf_component.yml` in your ESP-IDF project root:
+
+```yaml
+dependencies:
+  lewisxhe/sensorlib:
+    version: "^0.4.0"          # or use "*" to get the latest version
+```
+
 ## Examples
 
 - PlatformIO examples: see `platformio.ini` and uncomment the example `src_dir` you want to build.
@@ -124,6 +141,7 @@ lib_deps =
 | BMA423          | Accelerometer            | ✔️   | ❌   |
 | BMA456          | Accelerometer            | ✔️   | ❌   |
 | DRV2605         | Haptic Driver            | ✔️   | ❌   |
+| AW86224         | Haptic Driver            | ✔️   | ❌   |
 | CM32181         | Ambient Light Sensor     | ✔️   | ❌   |
 | LTR553          | Light & Proximity Sensor | ✔️   | ❌   |
 | FT3267          | Capacitive touch         | ✔️   | ❌   |

@@ -29,8 +29,10 @@
  */
 #pragma once
 
-#include "REG/QMI8658Constants.h"
-#include "SensorPlatform.hpp"
+#include "platform/comm/ComplexStaticDeviceWithHal.hpp"
+
+static constexpr uint8_t  QMI8658_L_SLAVE_ADDRESS = (0x6B);
+static constexpr uint8_t  QMI8658_H_SLAVE_ADDRESS = (0x6A);
 
 typedef struct {
     float x;
@@ -38,7 +40,7 @@ typedef struct {
     float z;
 } IMUdata;
 
-class SensorQMI8658 : public QMI8658Constants
+class SensorQMI8658 : public ComplexStaticDeviceWithHal
 {
 public:
     typedef void (*EventCallBack_t)(void);
@@ -212,7 +214,7 @@ public:
      * @note   This function initializes the SensorQMI8658 object.
      * @retval None
      */
-    SensorQMI8658() : comm(nullptr), hal(nullptr) {}
+    SensorQMI8658()  = default;
 
     /**
      * @brief  Destructor for SensorQMI8658.
@@ -221,9 +223,6 @@ public:
      */
     ~SensorQMI8658()
     {
-        if (comm) {
-            comm->deinit();
-        }
         if (fifo_buffer) {
             free(fifo_buffer);
             fifo_buffer = NULL;
@@ -239,122 +238,6 @@ public:
     void setPins(int _irq)
     {
         this->_irq = _irq;
-    }
-
-#if defined(ARDUINO)
-    /**
-     * @brief  Begin with Arduino TwoWire instance.
-     * @note   This function initializes the QMI8658 chip with the specified I2C parameters.
-     * @param  &wire: The TwoWire instance to use for I2C communication.
-     * @param  sda: The SDA pin number (default is -1).
-     * @param  scl: The SCL pin number (default is -1).
-     * @retval True if initialization is successful, false otherwise.
-     */
-    bool begin(TwoWire &wire, uint8_t addr = QMI8658_L_SLAVE_ADDRESS, int sda = -1, int scl = -1)
-    {
-        if (!beginCommon<SensorCommI2C, HalArduino>(comm, hal, wire, addr, sda, scl)) {
-            return false;
-        }
-        return initImpl();
-    }
-
-    /**
-     * @brief  Begin with Arduino SPIClass instance.
-     * @note   This function initializes the QMI8658 chip with the specified SPI parameters.
-     * @param  &spi: The SPIClass instance to use for SPI communication.
-     * @param  csPin: The chip select pin number.
-     * @param  mosi: The MOSI pin number (default is -1).
-     * @param  miso: The MISO pin number (default is -1).
-     * @param  sck: The SCK pin number (default is -1).
-     * @retval True if initialization is successful, false otherwise.
-     */
-    bool begin(SPIClass &spi, uint8_t csPin, int mosi = -1, int miso = -1, int sck = -1)
-    {
-        if (!beginCommon<SensorCommSPI, HalArduino>(comm, hal, spi, csPin, mosi, miso, sck)) {
-            return false;
-        }
-        return initImpl();
-    }
-
-#elif defined(ESP_PLATFORM)
-
-#if defined(USEING_I2C_LEGACY)
-
-    /**
-     * @brief  Begin with ESP-IDF I2C port number.
-     * @note   This function initializes the QMI8658 chip with the specified I2C parameters.
-     * @param  port_num: The I2C port number to use.
-     * @param  sda: The SDA pin number (default is -1).
-     * @param  scl: The SCL pin number (default is -1).
-     * @retval True if initialization is successful, false otherwise.
-     */
-    bool begin(i2c_port_t port_num, uint8_t addr = QMI8658_L_SLAVE_ADDRESS, int sda = -1, int scl = -1)
-    {
-        hal = std::make_unique<HalEspIDF>();
-        if (!hal) {
-            return false;
-        }
-        comm = std::make_unique<SensorCommI2C>(port_num, addr, sda, scl);
-        if (!comm) {
-            return false;
-        }
-        comm->init();
-        return initImpl();
-    }
-#else
-    /**
-     * @brief  Begin with ESP-IDF I2C master bus handle.
-     * @note   This function initializes the QMI8658 chip with the specified I2C parameters.
-     * @param  handle: The I2C master bus handle to use.
-     * @retval True if initialization is successful, false otherwise.
-     */
-    bool begin(i2c_master_bus_handle_t handle, uint8_t addr = QMI8658_L_SLAVE_ADDRESS)
-    {
-        hal = std::make_unique<HalEspIDF>();
-        if (!hal) {
-            return false;
-        }
-        comm = std::make_unique<SensorCommI2C>(handle, addr);
-        if (!comm) {
-            return false;
-        }
-        comm->init();
-        return initImpl();
-    }
-#endif  //ESP_PLATFORM
-
-    /**
-     * @brief  Begin with ESP-IDF I2C master bus handle.
-     * @note   This function initializes the QMI8658 chip with the specified I2C parameters.
-     * @param  handle: The I2C master bus handle to use.
-     * @retval True if initialization is successful, false otherwise.
-     */
-    bool begin(spi_host_device_t host, spi_device_handle_t handle, uint8_t csPin, int mosi, int miso, int sck)
-    {
-        if (!beginCommon<SensorCommSPI, HalEspIDF>(comm, hal,
-                host, handle, csPin, mosi, miso, sck)) {
-            return false;
-        }
-        return initImpl();
-    }
-#endif  //ARDUINO
-
-    /**
-    * @brief  Begin with custom callback functions.
-    * @note   This function initializes the QMI8658 chip with user-defined callback functions.
-    * @param  callback: The custom callback function for communication.
-    * @param  hal_callback: The custom callback function for hardware abstraction layer.
-    * @retval True if initialization is successful, false otherwise.
-    */
-    bool begin(SensorCommCustom::CustomCallback callback,
-               SensorCommCustomHal::CustomHalCallback hal_callback,
-               uint8_t addr = QMI8658_L_SLAVE_ADDRESS)
-    {
-        if (!beginCommCustomCallback <SensorCommCustom, SensorCommCustomHal>(COMM_CUSTOM,
-                callback, hal_callback, addr, comm, hal)) {
-            return false;
-        }
-        return initImpl();
     }
 
     /**
@@ -1005,7 +888,7 @@ public:
             return  comm->getRegisterBit(QMI8658_REG_STATUS_INT, 1);
         case ASYNC_MODE:
             //TODO: When Accel and Gyro are configured with different rates, this will always be false
-            if (_accel_enabled & _gyro_enabled) {
+            if (_accel_enabled && _gyro_enabled) {
                 return comm->readRegister(QMI8658_REG_STATUS0) & 0x03;
             } else if (_gyro_enabled) {
                 return comm->readRegister(QMI8658_REG_STATUS0) & 0x02;
@@ -1050,7 +933,7 @@ public:
     {
         enableSyncSampleMode();
         if (comm->writeRegister(QMI8658_REG_CAL1_L, 0x01) != 0) {
-            return -1;
+            return false;
         }
         return writeCommand(CTRL_CMD_AHB_CLOCK_GATING) == 0;
     }
@@ -2354,7 +2237,7 @@ private:
 
 protected:
 
-    bool initImpl()
+    bool initImpl(uint8_t param) override
     {
         uint8_t buffer[6] = {0};
 
@@ -2402,14 +2285,112 @@ protected:
         return true;
     }
 
-    std::unique_ptr<SensorCommBase> comm;
-    std::unique_ptr<SensorHal> hal;
+    // @brief  registers default value
+    static constexpr uint8_t QMI8658_REG_WHOAMI_DEFAULT = 0x05;
+    static constexpr uint8_t QMI8658_REG_STATUS_DEFAULT = 0x03;
+    static constexpr uint8_t QMI8658_REG_RESET_DEFAULT = 0xB0;
+
+
+    //* General Purpose Registers
+    static constexpr uint8_t QMI8658_REG_WHOAMI = 0x00;
+    static constexpr uint8_t QMI8658_REG_REVISION = 0x01;
+
+
+    //* Setup and Control Registers
+    static constexpr uint8_t QMI8658_REG_CTRL1 = 0x02;
+    static constexpr uint8_t QMI8658_REG_CTRL2 = 0x03;
+    static constexpr uint8_t QMI8658_REG_CTRL3 = 0x04;
+    // Reserved
+    static constexpr uint8_t QMI8658_REG_CTRL5 = 0x06;
+    // Reserved
+    static constexpr uint8_t QMI8658_REG_CTRL7 = 0x08;
+    static constexpr uint8_t QMI8658_REG_CTRL8 = 0x09;
+    static constexpr uint8_t QMI8658_REG_CTRL9 = 0x0A;
+
+    //* Host Controlled Calibration Registers (See CTRL9, Usage is Optional)
+    static constexpr uint8_t QMI8658_REG_CAL1_L = 0x0B;
+    static constexpr uint8_t QMI8658_REG_CAL1_H = 0x0C;
+    static constexpr uint8_t QMI8658_REG_CAL2_L = 0x0D;
+    static constexpr uint8_t QMI8658_REG_CAL2_H = 0x0E;
+    static constexpr uint8_t QMI8658_REG_CAL3_L = 0x0F;
+    static constexpr uint8_t QMI8658_REG_CAL3_H = 0x10;
+    static constexpr uint8_t QMI8658_REG_CAL4_L = 0x11;
+    static constexpr uint8_t QMI8658_REG_CAL4_H = 0x12;
+
+    //* FIFO Registers
+    static constexpr uint8_t QMI8658_REG_FIFO_WTM_TH = 0x13;
+    static constexpr uint8_t QMI8658_REG_FIFO_CTRL = 0x14;
+    static constexpr uint8_t QMI8658_REG_FIFO_COUNT = 0x15;
+    static constexpr uint8_t QMI8658_REG_FIFO_STATUS = 0x16;
+    static constexpr uint8_t QMI8658_REG_FIFO_DATA = 0x17;
+
+    //* Status Registers
+    static constexpr uint8_t QMI8658_REG_STATUS_INT = 0x2D;
+    static constexpr uint8_t QMI8658_REG_STATUS0 = 0x2E;
+    static constexpr uint8_t QMI8658_REG_STATUS1 = 0x2F;
+
+    //* Timestamp Register
+    static constexpr uint8_t QMI8658_REG_TIMESTAMP_L = 0x30;
+    static constexpr uint8_t QMI8658_REG_TIMESTAMP_M = 0x31;
+    static constexpr uint8_t QMI8658_REG_TIMESTAMP_H = 0x32;
+
+    //* Data Output Registers (16 bits 2’s Complement Except COD Sensor Data)
+    static constexpr uint8_t QMI8658_REG_TEMPERATURE_L = 0x33;
+    static constexpr uint8_t QMI8658_REG_TEMPERATURE_H = 0x34;
+    static constexpr uint8_t QMI8658_REG_AX_L = 0x35;
+    static constexpr uint8_t QMI8658_REG_AX_H = 0x36;
+    static constexpr uint8_t QMI8658_REG_AY_L = 0x37;
+    static constexpr uint8_t QMI8658_REG_AY_H = 0x38;
+    static constexpr uint8_t QMI8658_REG_AZ_L = 0x39;
+    static constexpr uint8_t QMI8658_REG_AZ_H = 0x3A;
+    static constexpr uint8_t QMI8658_REG_GX_L = 0x3B;
+    static constexpr uint8_t QMI8658_REG_GX_H = 0x3C;
+    static constexpr uint8_t QMI8658_REG_GY_L = 0x3D;
+    static constexpr uint8_t QMI8658_REG_GY_H = 0x3E;
+    static constexpr uint8_t QMI8658_REG_GZ_L = 0x3F;
+    static constexpr uint8_t QMI8658_REG_GZ_H = 0x40;
+
+    //* COD Indication and General Purpose Registers
+
+    // Calibration-On-Demand status register
+    static constexpr uint8_t QMI8658_REG_COD_STATUS = 0x46;
+    static constexpr uint8_t QMI8658_REG_DQW_L = 0x49;
+    static constexpr uint8_t QMI8658_REG_DQW_H = 0x4A;
+    static constexpr uint8_t QMI8658_REG_DQX_L = 0x4B;
+    static constexpr uint8_t QMI8658_REG_DQX_H = 0x4C;
+
+    static constexpr uint8_t QMI8658_REG_DQY_L = 0x4D;
+    static constexpr uint8_t QMI8658_REG_DQY_H = 0x4E;
+    static constexpr uint8_t QMI8658_REG_DQZ_L = 0x4F;
+    static constexpr uint8_t QMI8658_REG_DQZ_H = 0x50;
+
+    static constexpr uint8_t QMI8658_REG_DVX_L = 0x51;
+    static constexpr uint8_t QMI8658_REG_DVX_H = 0x52;
+    static constexpr uint8_t QMI8658_REG_DVY_L = 0x53;
+    static constexpr uint8_t QMI8658_REG_DVY_H = 0x54;
+    static constexpr uint8_t QMI8658_REG_DVZ_L = 0x55;
+    static constexpr uint8_t QMI8658_REG_DVZ_H = 0x56;
+
+    //* Activity Detection Output Registers
+    static constexpr uint8_t QMI8658_REG_TAP_STATUS = 0x59;
+    static constexpr uint8_t QMI8658_REG_STEP_CNT_LOW = 0x5A;
+    static constexpr uint8_t QMI8658_REG_STEP_CNT_MID = 0x5B;
+    static constexpr uint8_t QMI8658_REG_STEP_CNT_HIGH = 0x5C;
+    static constexpr uint8_t QMI8658_REG_RESET = 0x60;
+
+    //* Reset Register
+    static constexpr uint8_t QMI8658_REG_RST_RESULT = 0x4D;
+    static constexpr uint8_t QMI8658_REG_RST_RESULT_VAL = 0x80;
+
+    static constexpr uint8_t STATUS0_ACCEL_AVAIL = 0x01;
+    static constexpr uint8_t STATUS0_GYRO_AVAIL = 0x02;
+    static constexpr uint8_t QMI8658_ACCEL_LPF_MASK = 0xF9;
+    static constexpr uint8_t QMI8658_GYRO_LPF_MASK = 0x9F;
+
+    static constexpr uint8_t QMI8658_ACCEL_EN_MASK = 0x01;
+    static constexpr uint8_t QMI8658_GYRO_EN_MASK = 0x02;
+    static constexpr uint8_t QMI8658_ACCEL_GYRO_EN_MASK = 0x03;
+
+
+    static constexpr uint8_t QMI8658_FIFO_MAP_INT1 = 0x04;
 };
-
-
-
-
-
-
-
-

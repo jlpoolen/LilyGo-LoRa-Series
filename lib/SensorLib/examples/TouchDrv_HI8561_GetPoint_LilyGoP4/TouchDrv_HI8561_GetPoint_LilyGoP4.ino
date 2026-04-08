@@ -31,14 +31,19 @@
  *            Note: The screen must be initialized before touch can be initialized; initializing touch alone is not possible.
  *            This is consistent with the characteristics of most touch display integrated chips.
  *            HI8561 driver is available at https://github.com/Xinyuan-LilyGO/T-Display-P4
- * 
+ *
  */
 #include <Arduino.h>
+#include <TouchDrv.hpp>
 
 #ifdef ARDUINO_ESP32P4_DEV
-#include "TouchDrvHI8561.hpp"
-#include "IoExpanderXL9555.hpp"
-#include "SensorWireHelper.h"
+
+#if ESP_ARDUINO_VERSION_VAL(3,3,7) > ESP_ARDUINO_VERSION
+#error "This example requires Arduino-ESP32 version 3.3.7 or higher.Please update your Arduino-ESP32 core to the latest version to run this example."
+#endif
+
+#include <IoExpanderXL9555.hpp>
+#include <SensorWireHelper.h>
 #include "esp_lcd_mipi_dsi.h"
 #include "esp_lcd_panel_ops.h"
 #include "hi8561_driver.h"
@@ -130,7 +135,7 @@ void setup()
     // Scan I2C bus for devices
     SensorWireHelper::dumpDevices(Wire);
 
-    // The LilyGo-P4 relies on an external I/O extender to control the power supply of peripheral devices. 
+    // The LilyGo-P4 relies on an external I/O extender to control the power supply of peripheral devices.
     // First, initialize the external extender.
     if (!expander.begin(Wire, XL9555_SLAVE_ADDRESS0)) {
         while (1) {
@@ -154,7 +159,7 @@ void setup()
     esp_ldo_channel_handle_t ldo_channel_handle = NULL;
     esp_ldo_channel_config_t ldo_channel_config = {
         .chan_id = 3,
-        .voltage_mv = 1830,
+        .voltage_mv = 2500,
     };
     if (esp_ldo_acquire_channel(&ldo_channel_config, &ldo_channel_handle) != ESP_OK) {
         Serial.println("Set LDO channel failed");
@@ -216,16 +221,18 @@ void loop()
     if (touch_points.hasPoints()) {
         for (int i = 0; i < touch_points.getPointCount(); ++i) {
             const TouchPoint &point = touch_points.getPoint(i);
-            Serial.print("X[");
-            Serial.print(i);
-            Serial.print("]:");
+            Serial.print("ID: ");
+            Serial.print(point.id);
+            Serial.print(" ");
+            Serial.print("X: ");
             Serial.print(point.x);
             Serial.print(" ");
-            Serial.print(" Y[");
-            Serial.print(i);
-            Serial.print("]:");
+            Serial.print("Y: ");
             Serial.print(point.y);
             Serial.print(" ");
+            Serial.print("Pressure: ");
+            Serial.print(point.pressure);
+            Serial.println();
         }
 
         Serial.println();
@@ -246,7 +253,7 @@ static bool setupDisplay(esp_lcd_panel_handle_t *disp_panel)
     esp_lcd_dsi_bus_config_t bus_config = {
         .bus_id = 0,
         .num_data_lanes = HI8561_SCREEN_DATA_LANE_NUM,
-        .phy_clk_src = MIPI_DSI_PHY_CLK_SRC_DEFAULT,
+        .phy_clk_src = MIPI_DSI_PHY_PLLREF_CLK_SRC_DEFAULT_LEGACY,
         .lane_bit_rate_mbps = HI8561_SCREEN_LANE_BIT_RATE_MBPS,
     };
 
