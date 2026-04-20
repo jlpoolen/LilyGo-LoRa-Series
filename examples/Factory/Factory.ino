@@ -1514,101 +1514,33 @@ void sensorInfo(OLEDDisplay *display, OLEDDisplayUiState *disp_state, int16_t x,
     display->drawString(display->width() + x, y + 48, String(pressure / 1000.0) + " kPa");
 }
 
-
-static const int centreX = 32;
-static const int centreY = 40;
-static const int radius  = 10;
 Madgwick  filter;
 
-int last_dx = centreX, last_dy = centreY, dx, dy;
-
-void arrow(OLEDDisplay *display, int offsetX, int offsetY, int x2, int y2, int x1, int y1, int alength, int awidth, OLEDDISPLAY_COLOR  color)
-{
-    display->setColor(color);
-    float distance;
-    int dx, dy, x2o, y2o, x3, y3, x4, y4, k;
-    distance = sqrt(pow((x1 - x2), 2) + pow((y1 - y2), 2));
-    dx = x2 + (x1 - x2) * alength / distance;
-    dy = y2 + (y1 - y2) * alength / distance;
-    k = awidth / alength;
-    x2o = x2 - dx;
-    y2o = dy - y2;
-    x3 = y2o * k + dx;
-    y3 = x2o * k + dy;
-    x4 = dx - y2o * k;
-    y4 = dy - x2o * k;
-    display->drawLine(x1 + offsetX, y1 + offsetY, offsetX + x2, offsetY + y2);
-    display->drawLine(x1 + offsetX, y1 + offsetY, offsetX + dx, offsetY + dy);
-    display->drawLine(x3 + offsetX, y3 + offsetY, offsetX + x4, offsetY + y4);
-    display->drawLine(x3 + offsetX, y3 + offsetY, offsetX + x2, offsetY + y2);
-    display->drawLine(x2 + offsetX, y2 + offsetY, offsetX + x4, offsetY + y4);
-}
-
-int drawCompass(OLEDDisplay *display, int16_t x, int16_t y, float magX, float magY)
-{
-    int angle;
-    display->drawString(x + 29, y + 16, "N");
-    display->drawString(x + 0,  y + 32, "W");
-    display->drawString(x + 58, y + 32, "E");
-    display->drawString(x + 29, y + 50, "S");
-
-    float heading = atan2(magY, magX); // Result is in radians
-    // Now add the 'Declination Angle' for you location. Declination is the variation in magnetic field at your location.
-    // Find your declination here: http://www.magnetic-declination.com/
-    // At my location it is :  -2° 20' W, or -2.33 Degrees, which needs to be in radians so = -2.33 / 180 * PI = -0.041 West is + E is -
-    // Make declination = 0 if you can't find your Declination value, the error is negible for nearly all locations
-    float declination = -0.041;
-    heading = heading + declination;
-    if (heading < 0)    heading += 2 * PI; // Correct for when signs are reversed.
-    if (heading > 2 * PI) heading -= 2 * PI; // Correct for when heading exceeds 360-degree, especially when declination is included
-    angle = int(heading * 180 / M_PI); // Convert radians to degrees for more a more usual result
-    // For the screen -X = up and +X = down and -Y = left and +Y = right, so does not follow coordinate conventions
-    dx = (0.7 * radius * cos((angle - 90) * 3.14 / 180)) + centreX + x; // calculate X position for the screen coordinates - can be confusing!
-    dy = (0.7 * radius * sin((angle - 90) * 3.14 / 180)) + centreY + y; // calculate Y position for the screen coordinates - can be confusing!
-    arrow(display, x, y,  last_dx,  last_dy,  centreX + x,  centreY + y, 2, 2, BLACK); // Erase last arrow
-    arrow(display, x, y,  dx,  dy,  x + centreX,  centreY + y, 2, 2, WHITE); // Draw arrow in new position
-    return angle;
-}
-
-void getMagData(float *x, float *y)
-{
-    float z = 0;
-    if (!magnetometer) {
-        Serial.println("Magnetometer not initialized");
-        return;
-    }
-    MagnetometerData data;
-    if (magnetometer->readData(data)) {
-        *x = data.magnetic_field.x;
-        *y = data.magnetic_field.y;
-        Serial.printf("Magnetometer data read: x=%.2f, y=%.2f, z=%.2f\n", *x, *y, z);
-    }
-}
 
 void imuInfo(OLEDDisplay *display, OLEDDisplayUiState *disp_state, int16_t x, int16_t y)
 {
-    static float  magX = 0, magY = 0;
-    static int angle = 0;
-    static float roll, pitch, heading;
+    static float roll, pitch, heading, strength;
     static uint32_t interval = 0;
 
+    MagnetometerData data;
     if (millis() - interval > 100) {
-        getMagData(&magX, &magY);
+        if (magnetometer) {
+            if (magnetometer->readData(data)) {
+                strength = MagnetometerUtils::calculateMagneticStrength(data);
+                strength = MagnetometerUtils::gaussToMicroTesla(strength);
+            }
+        }
         interval = millis();
     }
-
-    angle = drawCompass(display, x, y, magX, magY);
 
     display->setFont(Roboto_Mono_Medium_12);
     display->setTextAlignment(TEXT_ALIGN_CENTER);
     display->drawString(64 + x, 0 + y, "IMU");
 
     display->setTextAlignment(TEXT_ALIGN_LEFT);
-    display->setColor(BLACK);
-    display->fillRect(x + 80, y + 16, 25, 50);
-    display->setColor(WHITE);
-    display->setFont(Roboto_Mono_Medium_12);
-    display->drawString(x + 75, y + 16, String(angle) + "°");
+    display->drawString(x + 0, y + 16, "STRENGTH:");
+    display->drawString(x + 0, y + 32, "ROLL:");
+    display->drawString(x + 0, y + 48, "HEADING:");
 
     // Read raw data from IMU
     if (digitalRead(IMU_INT) == HIGH) {
@@ -1620,10 +1552,12 @@ void imuInfo(OLEDDisplay *display, OLEDDisplayUiState *disp_state, int16_t x, in
         roll = filter.getRoll();
         pitch = filter.getPitch();
         heading = filter.getYaw();
-        // Serial.printf("roll:%.2f pitch:%.2f heading:%.2f\n", roll, pitch, heading);
     }
 
-    display->drawString(x + 75, y + 32, String(heading) + "°");
+    display->setTextAlignment(TEXT_ALIGN_RIGHT);
+    display->drawString(display->width() + x, y + 16, String(strength) + "uT");
+    display->drawString(display->width() + x, y + 32, String(roll) + "°");
+    display->drawString(display->width() + x, y + 48, String(heading) + "°");
 }
 
 static void beginSensor()
