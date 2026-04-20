@@ -25,7 +25,7 @@ int16_t LoRaWANNode::sendReceive(const String& strUp, uint8_t fPort, String& str
   // build a temporary buffer
   // LoRaWAN downlinks can have 250 bytes at most with 1 extra byte for NULL
   size_t lenDown = 0;
-  uint8_t dataDown[RADIOLIB_LORAWAN_MAX_DOWNLINK_SIZE + 1];
+  uint8_t dataDown[RADIOLIB_LORAWAN_MAX_PAYLOAD_SIZE + 1];
 
   state = this->sendReceive(reinterpret_cast<const uint8_t*>(dataUp), strlen(dataUp), fPort, dataDown, &lenDown, isConfirmed, eventUp, eventDown);
 
@@ -45,7 +45,7 @@ int16_t LoRaWANNode::sendReceive(const char* strUp, uint8_t fPort, bool isConfir
   // build a temporary buffer
   // LoRaWAN downlinks can have 250 bytes at most with 1 extra byte for NULL
   size_t lenDown = 0;
-  uint8_t dataDown[RADIOLIB_LORAWAN_MAX_DOWNLINK_SIZE + 1];
+  uint8_t dataDown[RADIOLIB_LORAWAN_MAX_PAYLOAD_SIZE + 1];
   
   return(this->sendReceive(reinterpret_cast<uint8_t*>(const_cast<char*>(strUp)), strlen(strUp), fPort, dataDown, &lenDown, isConfirmed, eventUp, eventDown));
 }
@@ -58,7 +58,7 @@ int16_t LoRaWANNode::sendReceive(const uint8_t* dataUp, size_t lenUp, uint8_t fP
   // build a temporary buffer
   // LoRaWAN downlinks can have 250 bytes at most with 1 extra byte for NULL
   size_t lenDown = 0;
-  uint8_t dataDown[RADIOLIB_LORAWAN_MAX_DOWNLINK_SIZE + 1];
+  uint8_t dataDown[RADIOLIB_LORAWAN_MAX_PAYLOAD_SIZE + 1];
 
   return(this->sendReceive(dataUp, lenUp, fPort, dataDown, &lenDown, isConfirmed, eventUp, eventDown));
 }
@@ -1200,6 +1200,11 @@ void LoRaWANNode::stopMulticastSession() {
 
   // stop any ongoing activity
   this->phyLayer->standby();
+  
+  if(this->ledPins[RADIOLIB_LORAWAN_RX_BC] != RADIOLIB_NC) {
+    Module *mod = this->phyLayer->getMod();
+    mod->hal->digitalWrite(this->ledPins[RADIOLIB_LORAWAN_RX_BC], mod->hal->GpioLevelLow);
+  }
 
   // if in Class C, re-open RxC window with normal unicast configuration
   if(this->lwClass == RADIOLIB_LORAWAN_CLASS_C) {
@@ -1467,6 +1472,10 @@ int16_t LoRaWANNode::transmitUplink(const LoRaWANChannel_t* chnl, uint8_t* in, u
     }
   }
 
+  if(this->ledPins[0] != RADIOLIB_NC) {
+    mod->hal->digitalWrite(this->ledPins[0], mod->hal->GpioLevelHigh);
+  }
+
   // start transmission, and time the duration of launchMode() to offset window timing
   RadioLibTime_t spiStart = mod->hal->millis();
   state = this->phyLayer->launchMode();
@@ -1491,6 +1500,11 @@ int16_t LoRaWANNode::transmitUplink(const LoRaWANChannel_t* chnl, uint8_t* in, u
 
   // set the timestamp so that we can measure when to start receiving
   this->tUplinkEnd = mod->hal->millis();
+
+  if(this->ledPins[0] != RADIOLIB_NC) {
+    mod->hal->digitalWrite(this->ledPins[0], mod->hal->GpioLevelLow);
+  }
+
   RADIOLIB_DEBUG_PROTOCOL_PRINTLN("Uplink sent (ToA = %d ms)", toa);
 
   // increase Time on Air of the uplink sequence
@@ -1568,6 +1582,10 @@ int16_t LoRaWANNode::receiveClassA(uint8_t dir, const LoRaWANChannel_t* dlChanne
     this->sleepDelay(tWindow - tNow);
   }
 
+  if(window < 4 && this->ledPins[window] != RADIOLIB_NC) {
+    mod->hal->digitalWrite(this->ledPins[window], mod->hal->GpioLevelHigh);
+  }
+
   // open Rx window by starting receive with specified timeout
   state = this->phyLayer->launchMode();
   RadioLibTime_t tOpen = mod->hal->millis();
@@ -1595,6 +1613,9 @@ int16_t LoRaWANNode::receiveClassA(uint8_t dir, const LoRaWANChannel_t* dlChanne
     this->phyLayer->clearPacketReceivedAction();
     this->phyLayer->clearIrq(1UL << RADIOLIB_IRQ_TIMEOUT);
     this->phyLayer->standby();
+    if(window < 4 && this->ledPins[window] != RADIOLIB_NC) {
+      mod->hal->digitalWrite(this->ledPins[window], mod->hal->GpioLevelLow);
+    }
     return(0);  // no downlink
   }
   
@@ -1624,6 +1645,9 @@ int16_t LoRaWANNode::receiveClassA(uint8_t dir, const LoRaWANChannel_t* dlChanne
   // we have a message, clear actions, go to standby
   this->phyLayer->clearPacketReceivedAction();
   this->phyLayer->standby();
+  if(window < 4 && this->ledPins[window] != RADIOLIB_NC) {
+    mod->hal->digitalWrite(this->ledPins[window], mod->hal->GpioLevelLow);
+  }
 
   // if all windows passed without receiving anything, return 0 for no window
   if(!downlinkAction) {
@@ -1675,6 +1699,10 @@ int16_t LoRaWANNode::receiveClassC(RadioLibTime_t timeout) {
   state = this->phyLayer->stageMode(RADIOLIB_RADIO_MODE_RX, &modeCfg);
   RADIOLIB_ASSERT(state);
 
+  if(this->ledPins[RADIOLIB_LORAWAN_RX_BC] != RADIOLIB_NC) {
+    mod->hal->digitalWrite(this->ledPins[RADIOLIB_LORAWAN_RX_BC], mod->hal->GpioLevelHigh);
+  }
+
   // open RxC window by starting receive with specified timeout
   state = this->phyLayer->launchMode();
   RadioLibTime_t tOpen = mod->hal->millis();
@@ -1683,8 +1711,7 @@ int16_t LoRaWANNode::receiveClassC(RadioLibTime_t timeout) {
 
   if(timeout) {
     // wait for the DIO interrupt to fire (RxDone or RxTimeout)
-    // use a small additional delay in case the RxTimeout interrupt is slow to fire
-    while(!downlinkAction && mod->hal->millis() - tOpen <= timeout + this->scanGuard) {
+    while(!downlinkAction && mod->hal->millis() - tOpen <= timeout) {
       mod->hal->yield();
     }
     RADIOLIB_DEBUG_PROTOCOL_PRINTLN("Closed RxC window");
@@ -1700,6 +1727,9 @@ int16_t LoRaWANNode::receiveClassC(RadioLibTime_t timeout) {
       this->phyLayer->clearPacketReceivedAction();
       this->phyLayer->clearIrq(1UL << RADIOLIB_IRQ_TIMEOUT);
       this->phyLayer->standby();
+      if(this->ledPins[RADIOLIB_LORAWAN_RX_BC] != RADIOLIB_NC) {
+        mod->hal->digitalWrite(this->ledPins[RADIOLIB_LORAWAN_RX_BC], mod->hal->GpioLevelLow);
+      }
       return(0);  // no downlink
     }
 
@@ -1711,6 +1741,9 @@ int16_t LoRaWANNode::receiveClassC(RadioLibTime_t timeout) {
     // we have a message, clear actions, go to standby
     this->phyLayer->clearPacketReceivedAction();
     this->phyLayer->standby();
+    if(this->ledPins[RADIOLIB_LORAWAN_RX_BC] != RADIOLIB_NC) {
+      mod->hal->digitalWrite(this->ledPins[RADIOLIB_LORAWAN_RX_BC], mod->hal->GpioLevelLow);
+    }
 
     // if all windows passed without receiving anything, return 0 for no window
     if(!downlinkAction) {
@@ -1798,7 +1831,7 @@ int16_t LoRaWANNode::parseDownlink(uint8_t* data, size_t* len, uint8_t window, L
   #if !RADIOLIB_STATIC_ONLY
     uint8_t* downlinkMsg = new uint8_t[RADIOLIB_AES128_BLOCK_SIZE + downlinkMsgLen];
   #else
-    uint8_t downlinkMsg[RADIOLIB_STATIC_ARRAY_SIZE];
+    uint8_t downlinkMsg[RADIOLIB_AES128_BLOCK_SIZE + RADIOLIB_STATIC_ARRAY_SIZE];
   #endif
 
   // read the data
@@ -2061,7 +2094,7 @@ int16_t LoRaWANNode::parseDownlink(uint8_t* data, size_t* len, uint8_t window, L
   if(fOptsLen > 0) {
     uint8_t* mPtr = fOptsPtr;
     uint8_t procLen = 0;
-    uint8_t fOptsRe[RADIOLIB_LORAWAN_MAX_DOWNLINK_SIZE] = { 0 };
+    uint8_t fOptsRe[RADIOLIB_LORAWAN_MAX_PAYLOAD_SIZE] = { 0 };
     uint8_t fOptsReLen = 0;
 
     // indication whether LinkAdr MAC command has been processed
@@ -3214,6 +3247,17 @@ void LoRaWANNode::setCSMA(bool csmaEnabled, uint8_t maxChanges, uint8_t backoffM
 
 void LoRaWANNode::setDeviceStatus(uint8_t battLevel) {
   this->battLevel = battLevel;
+}
+
+void LoRaWANNode::setActivityLeds(const uint32_t pins[4]) {
+  Module *mod = this->phyLayer->getMod();
+  // configure each provided pin and store in the ledPins array
+  for(uint8_t i = 0; i < 4; i++) {
+    if(pins[i] != RADIOLIB_NC) {
+      mod->hal->pinMode(pins[i], mod->hal->GpioModeOutput);
+    }
+    this->ledPins[i] = pins[i];
+  }
 }
 
 void LoRaWANNode::scheduleTransmission(RadioLibTime_t tUplink) {

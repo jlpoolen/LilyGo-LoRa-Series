@@ -11,6 +11,98 @@
 // maximum number of allowed frontend calibration attempts
 #define RADIOLIB_LR2021_MAX_CAL_ATTEMPTS    (10)
 
+// Sub-GHz: below this RF frequency (MHz) use Table 7-17 (490 MHz ref.); at/above use Table 7-16 (915 MHz ref.).
+#define RADIOLIB_LR2021_LF_PA_TABLE_490_MHZ_MAX    (700.0f)
+
+// Table 7-16: Optimal Values for 915 MHz Semtech Reference Design (LF PA).
+// Integer targeted dBm 22..10 only: half-dBm rows (e.g. 21.5) need a future API that passes 0.5 dB steps.
+// SetTxParams first byte = `txHalfDbm` (signed half-dBm); matches datasheet TX_PARAM column * 2.
+static const struct {
+  int8_t txHalfDbm;
+  uint8_t paLfDutyCycle;
+  uint8_t paLfSlices;
+} RADIOLIB_LR2021_TABLE_7_16_915_LF[] = {
+  /* 22 */ { 44, 7, 6 },
+  /* 21 */ { 42, 7, 7 },
+  /* 20 */ { 41, 6, 6 },
+  /* 19 */ { 39, 6, 6 },
+  /* 18 */ { 38, 5, 6 },
+  /* 17 */ { 36, 5, 6 },
+  /* 16 */ { 36, 4, 4 },
+  /* 15 */ { 33, 5, 4 },
+  /* 14 */ { 34, 4, 2 },
+  /* 13 */ { 31, 4, 3 },
+  /* 12 */ { 30, 5, 1 },
+  /* 11 */ { 32, 2, 2 },
+  /* 10 */ { 32, 2, 1 },
+};
+
+// `targetedDbm` integer 10..22 only (Table 7-16 rows).
+static void lr2021Table716LfRow(int8_t targetedDbm, int8_t* txHalfDbm, uint8_t* duty, uint8_t* slices) {
+  if(targetedDbm < 10) { targetedDbm = 10; }
+  if(targetedDbm > 22) { targetedDbm = 22; }
+  const auto& e = RADIOLIB_LR2021_TABLE_7_16_915_LF[22 - targetedDbm];
+  *txHalfDbm = e.txHalfDbm;
+  *duty = e.paLfDutyCycle;
+  *slices = e.paLfSlices;
+}
+
+// Table 7-17: Optimal Values for 490 MHz Semtech Reference Design (LF PA). Integer targeted dBm 20..10.
+static const struct {
+  int8_t txHalfDbm;
+  uint8_t paLfDutyCycle;
+  uint8_t paLfSlices;
+} RADIOLIB_LR2021_TABLE_7_17_490_LF[] = {
+  /* 20 */ { 40, 7, 7 },
+  /* 19 */ { 38, 7, 7 },
+  /* 18 */ { 36, 7, 6 },
+  /* 17 */ { 34, 7, 6 },
+  /* 16 */ { 32, 7, 6 },
+  /* 15 */ { 31, 7, 4 },
+  /* 14 */ { 31, 6, 4 },
+  /* 13 */ { 29, 7, 2 },
+  /* 12 */ { 30, 5, 3 },
+  /* 11 */ { 29, 5, 2 },
+  /* 10 */ { 31, 4, 2 },
+};
+
+static void lr2021Table717LfRow(int8_t targetedDbm, int8_t* txHalfDbm, uint8_t* duty, uint8_t* slices) {
+  if(targetedDbm < 10) { targetedDbm = 10; }
+  if(targetedDbm > 20) { targetedDbm = 20; }
+  const auto& e = RADIOLIB_LR2021_TABLE_7_17_490_LF[20 - targetedDbm];
+  *txHalfDbm = e.txHalfDbm;
+  *duty = e.paLfDutyCycle;
+  *slices = e.paLfSlices;
+}
+
+// Table 7-18: Optimal Values for 2445 MHz Semtech Reference Design (HF PA). Integer targeted dBm 0..12.
+static const struct {
+  int8_t txHalfDbm;
+  uint8_t paHfDutyCycle;
+} RADIOLIB_LR2021_TABLE_7_18_2445_HF[] = {
+  /* 12 */ { 24, 16 },
+  /* 11 */ { 24, 26 },
+  /* 10 */ { 24, 30 },
+  /*  9 */ { 22, 30 },
+  /*  8 */ { 21, 31 },
+  /*  7 */ { 18, 30 },
+  /*  6 */ { 16, 30 },
+  /*  5 */ { 15, 31 },
+  /*  4 */ { 10, 25 },
+  /*  3 */ { 8, 25 },
+  /*  2 */ { 7, 28 },
+  /*  1 */ { 6, 30 },
+  /*  0 */ { 4, 30 },
+};
+
+static void lr2021Table718HfRow(int8_t targetedDbm, int8_t* txHalfDbm, uint8_t* hfDuty) {
+  if(targetedDbm < 0) { targetedDbm = 0; }
+  if(targetedDbm > 12) { targetedDbm = 12; }
+  const auto& e = RADIOLIB_LR2021_TABLE_7_18_2445_HF[12 - targetedDbm];
+  *txHalfDbm = e.txHalfDbm;
+  *hfDuty = e.paHfDutyCycle;
+}
+
 int16_t LR2021::setFrequency(float freq) {
   return(this->setFrequency(freq, false));
 }
@@ -76,22 +168,78 @@ int16_t LR2021::setOutputPower(int8_t power) {
 }
 
 int16_t LR2021::setOutputPower(int8_t power, uint32_t rampTimeUs) {
-  // check if power value is configurable
   int16_t state = this->checkOutputPower(power, NULL);
   RADIOLIB_ASSERT(state);
-  
-  //! \TODO: [LR2021] how and when to configure OCP?
-  //! \TODO: [LR2021] Determine the optimal PA configuration
-  // update PA config
-  state = setPaConfig(this->highFreq, 
-    RADIOLIB_LR2021_PA_LF_MODE_FSM, 
-    RADIOLIB_LR2021_PA_LF_DUTY_CYCLE_UNUSED, 
-    RADIOLIB_LR2021_PA_LF_SLICES_UNUSED, 
-    RADIOLIB_LR2021_PA_HF_DUTY_CYCLE_UNUSED);
-  RADIOLIB_ASSERT(state);
 
-  // set output power
-  state = setTxParams(power, roundRampTime(rampTimeUs));
+  // pa_sel: 0 = LF (Sub-GHz), 1 = HF (1.9–2.5 GHz). Same encoding as lr20xx reference driver.
+  uint8_t paSel = this->highFreq ? (uint8_t)1 : (uint8_t)0;
+  uint8_t paLfMode = RADIOLIB_LR2021_PA_LF_MODE_FSM;
+  uint8_t paLfDutyCycle = RADIOLIB_LR2021_PA_LF_DUTY_CYCLE_UNUSED;
+  uint8_t paLfSlices = RADIOLIB_LR2021_PA_LF_SLICES_UNUSED;
+  uint8_t paHfDutyCycle = RADIOLIB_LR2021_PA_HF_DUTY_CYCLE_UNUSED;
+  // TX_PARAM from tables is signed half-dBm (not always 2 * targeted dBm).
+  int8_t lfTxHalfDbm = (int8_t)(power * 2);
+  int8_t hfTxHalfDbm = (int8_t)(power * 2);
+
+  if(this->highFreq) {
+    // HF PA: Table 7-18 (2445 MHz); LF nibbles per Semtech reference (7/6).
+    paLfDutyCycle = (uint8_t)0x07;
+    paLfSlices = (uint8_t)0x06;
+    if(power >= 0) {
+      lr2021Table718HfRow(power, &hfTxHalfDbm, &paHfDutyCycle);
+    } else {
+      lr2021Table718HfRow(0, &hfTxHalfDbm, &paHfDutyCycle);
+      hfTxHalfDbm = (int8_t)(power * 2);
+    }
+  } else if(this->freqMHz < RADIOLIB_LR2021_LF_PA_TABLE_490_MHZ_MAX) {
+    // LF PA: Table 7-17 (490 MHz ref.), max +20 dBm in table; 21–22 use row 20 PA + requested TX half-dBm.
+    if(power > 20) {
+      lr2021Table717LfRow(20, &lfTxHalfDbm, &paLfDutyCycle, &paLfSlices);
+      lfTxHalfDbm = (int8_t)(power * 2);
+    } else if(power >= 10) {
+      lr2021Table717LfRow(power, &lfTxHalfDbm, &paLfDutyCycle, &paLfSlices);
+    } else {
+      lr2021Table717LfRow(10, &lfTxHalfDbm, &paLfDutyCycle, &paLfSlices);
+      lfTxHalfDbm = (int8_t)(power * 2);
+    }
+  } else {
+    // LF PA: Table 7-16 (915 MHz ref.)
+    if(power >= 10) {
+      lr2021Table716LfRow(power, &lfTxHalfDbm, &paLfDutyCycle, &paLfSlices);
+    } else {
+      lr2021Table716LfRow(10, &lfTxHalfDbm, &paLfDutyCycle, &paLfSlices);
+      lfTxHalfDbm = (int8_t)(power * 2);
+    }
+  }
+
+  (void)clearErrors();
+
+  state = setPaConfig(paSel, paLfMode, paLfDutyCycle, paLfSlices, paHfDutyCycle);
+  RADIOLIB_ASSERT(state);
+  #if RADIOLIB_DEBUG_BASIC
+  RADIOLIB_DEBUG_BASIC_PRINTLN("LR2021 PA cfg: hf=%d lf_dc=0x%X lf_sl=0x%X hf_dc=0x%X",
+    (int)this->highFreq, (int)paLfDutyCycle, (int)paLfSlices, (int)paHfDutyCycle);
+  #endif
+
+  state = selPa(paSel);
+  RADIOLIB_ASSERT(state);
+  #if RADIOLIB_DEBUG_BASIC
+  RADIOLIB_DEBUG_BASIC_PRINTLN("LR2021 PA sel: %s", paSel ? "HF" : "LF");
+  #endif
+
+  if(this->highFreq) {
+    state = setTxParamsHalfDbm(hfTxHalfDbm, roundRampTime(rampTimeUs));
+  } else {
+    state = setTxParamsHalfDbm(lfTxHalfDbm, roundRampTime(rampTimeUs));
+  }
+  RADIOLIB_ASSERT(state);
+  #if RADIOLIB_DEBUG_BASIC
+  uint16_t err = 0;
+  if(getErrors(&err) == RADIOLIB_ERR_NONE) {
+    RADIOLIB_DEBUG_BASIC_PRINTLN("LR2021 device errors after PA/TX: 0x%X", err);
+  }
+  #endif
+
   return(state);
 }
 
